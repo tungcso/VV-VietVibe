@@ -9,6 +9,7 @@ type VocabCard = {
   id: string;
   term: string;
   reading: string;
+  tag: string;
   meaning: string;
   example: string;
   note: string;
@@ -19,6 +20,7 @@ const cards: VocabCard[] = [
     id: "chemgio",
     term: "chém gió",
     reading: "tu vung",
+    tag: "Từ lóng",
     meaning: "大げさに話す・ほら吹き",
     example: "彼はいつも大げさに話すから、あまり信じないほうがいい。",
     note: "友達同士の会話で使うカジュアルな表現。",
@@ -27,6 +29,7 @@ const cards: VocabCard[] = [
     id: "dithoi",
     term: "đi thôi",
     reading: "tu vung",
+    tag: "Từ thông thường",
     meaning: "行こう・出発しよう",
     example: "もう遅いね、行こう。",
     note: "親しい相手に使う柔らかい誘い方。",
@@ -35,6 +38,7 @@ const cards: VocabCard[] = [
     id: "ngon",
     term: "ngon",
     reading: "tu vung",
+    tag: "Văn chương",
     meaning: "おいしい・素晴らしい",
     example: "このフォーは本当においしい！",
     note: "食べ物にも会話にも使える万能表現。",
@@ -119,8 +123,8 @@ export default function VocabScreen() {
           >
             <div className="relative vv-flip-inner">
               <div className="vv-flip-side w-full rounded-3xl border border-(--vv-border) bg-white px-6 py-10 text-center shadow-[0_14px_30px_rgba(35,70,60,0.12)]">
-                <span className="inline-flex items-center rounded-full bg-(--vv-accent) px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
-                  {mode === "vocab" ? "từ vựng" : "nghe"}
+                <span className="inline-flex items-center rounded-full bg-(--vv-accent) px-3 py-1 text-[11px] font-semibold tracking-wide text-white">
+                  {card.tag}
                 </span>
 
                 <h2 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
