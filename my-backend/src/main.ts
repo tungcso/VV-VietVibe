@@ -3,8 +3,7 @@ import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 const mongoose = require('mongoose');
-
-const MONGO_URI = 'mongodb://localhost:27017/vietvibe_db';
+import { MONGO_URI, PORT } from './config/env';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -31,10 +30,9 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
-  
-  // Bạn có thể đổi cổng thành 3001 để không trùng với Next.js
-  await app.listen(3001); 
-  console.log(`Application is running on: http://localhost:3001`);
-  console.log(`Swagger UI is available at: http://localhost:3001/api`);
+
+  await app.listen(PORT);
+  console.log(`Application is running on: http://localhost:${PORT}`);
+  console.log(`Swagger UI is available at: http://localhost:${PORT}/api`);
 }
 bootstrap();

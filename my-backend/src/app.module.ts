@@ -5,10 +5,11 @@ import { AppService } from './app.service';
 import { Product, ProductSchema } from './schemas/product.schema'; // Import vào đây
 import { UsersModule } from './users/users.module';
 import { VocabularyModule } from './vocabulary/vocabulary.module';
+import { MONGO_URI } from './config/env';
 
 @Module({
   imports: [
-    MongooseModule.forRoot('mongodb://localhost:27017/vietvibe_db'),
+    MongooseModule.forRoot(MONGO_URI),
     // Thêm dòng này để đăng ký Model
     MongooseModule.forFeature([{ name: Product.name, schema: ProductSchema }]),
     UsersModule,
