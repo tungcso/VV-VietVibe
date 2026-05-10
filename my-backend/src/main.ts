@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, BadRequestException } from '@nestjs/common';
 const mongoose = require('mongoose');
 import { MONGO_URI, PORT } from './config/env';
 
@@ -15,6 +15,24 @@ async function bootstrap() {
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
+      exceptionFactory: (errors) => {
+        const messages = errors
+          .map((error) => {
+            const constraints = Object.values(error.constraints || {});
+            return constraints
+              .map((msg: string) => {
+                // Translate common validation messages to Japanese
+                return msg
+                  .replace(/must be longer than or equal to (\d+) characters/i, '最小$1文字以上である必要があります')
+                  .replace(/must be an email/i, '有効なメールアドレスである必要があります')
+                  .replace(/must be a string/i, '文字列である必要があります')
+                  .replace(/should not be empty/i, '空にすることはできません');
+              })
+              .join(', ');
+          })
+          .join('; ');
+        return new BadRequestException(messages);
+      },
     }),
   );
   
