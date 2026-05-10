@@ -46,6 +46,7 @@ cp .env.example .env
 Mở file `.env` và cập nhật các thông số sau (nếu cần):
 - `MONGO_URI`: Địa chỉ kết nối MongoDB của bạn (Mặc định: `mongodb://localhost:27017/vietvibe_db`).
 - `PORT`: Cổng chạy backend (mặc định là `3001`).
+- `JWT_SECRET`: Mã bí mật để ký token JWT (Mặc định: `change_this_secret`).
 
 #### Bước 3: Khởi tạo dữ liệu (Seeding)
 Hệ thống cần dữ liệu mẫu (Master data, Business data) để hoạt động. Chạy lệnh sau để import dữ liệu vào MongoDB:
