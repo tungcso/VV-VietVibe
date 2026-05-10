@@ -1,9 +1,23 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { ValidationPipe } from '@nestjs/common';
+const mongoose = require('mongoose');
+
+const MONGO_URI = 'mongodb://localhost:27017/vietvibe_db';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  if (mongoose.connection.readyState === 0) {
+    await mongoose.connect(MONGO_URI);
+  }
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
   
   // Bật CORS để Next.js có thể gọi API
   app.enableCors(); 

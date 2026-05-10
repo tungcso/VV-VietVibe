@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { Product, ProductSchema } from './schemas/product.schema'; // Import vào đây
 import { UsersModule } from './users/users.module';
+import { VocabularyModule } from './vocabulary/vocabulary.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { UsersModule } from './users/users.module';
     // Thêm dòng này để đăng ký Model
     MongooseModule.forFeature([{ name: Product.name, schema: ProductSchema }]),
     UsersModule,
+    VocabularyModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -17,14 +17,9 @@ const {
   UserProgress 
 } = require('../models');
 
-const MONGO_URI = process.env.MONGO_URI;
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/vietvibe_db';
 
 async function seedProgressData() {
-  if (!MONGO_URI) {
-    console.error('Lỗi: Thiếu MONGO_URI trong môi trường. Vui lòng kiểm tra lại file .env.');
-    process.exit(1);
-  }
-
   try {
     console.log('1. Đang kết nối MongoDB...');
     await mongoose.connect(MONGO_URI);
