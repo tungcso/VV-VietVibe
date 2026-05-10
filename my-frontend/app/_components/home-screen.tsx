@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 type ToggleField = "vocab" | "listen";
 
@@ -143,6 +143,20 @@ export default function HomeScreen() {
   const [sections, setSections] = useState<Section[]>(initialSections);
   const [openId, setOpenId] = useState<string>(initialSections[0]?.id ?? "");
   const [query, setQuery] = useState<string>("");
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMode, setNotificationMode] = useState<"login" | "register">("login");
+
+  useEffect(() => {
+    const hasSuccess = localStorage.getItem("showLoginSuccess");
+    const mode = localStorage.getItem("loginSuccessMode") as "login" | "register" || "login";
+    
+    if (hasSuccess) {
+      setShowNotification(true);
+      setNotificationMode(mode);
+      localStorage.removeItem("showLoginSuccess");
+      localStorage.removeItem("loginSuccessMode");
+    }
+  }, []);
 
   const { total, done } = useMemo(() => {
     let totalCount = 0;
@@ -200,6 +214,26 @@ export default function HomeScreen() {
 
   return (
     <div className="min-h-screen w-full bg-linear-to-b from-[#f8f6f2] via-[#f3f7f3] to-[#ecf2ee]">
+      {showNotification && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm rounded-2xl bg-white shadow-lg p-4 flex items-center gap-3 mx-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white flex-shrink-0">
+            ✓
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm text-green-700">
+              {notificationMode === "login" ? "ログインが完了しました！" : "登録が完了しました！"}
+            </p>
+            <p className="text-xs text-green-600">VietVibeへようこそ</p>
+          </div>
+          <button
+            onClick={() => setShowNotification(false)}
+            className="text-gray-400 hover:text-gray-600 flex-shrink-0 text-lg leading-none"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       <div className="mx-auto flex w-full max-w-105 flex-col gap-6 px-4 pb-10 pt-8">
         <header className="flex items-center justify-between vv-rise-in">
           <div className="flex items-center gap-3">
