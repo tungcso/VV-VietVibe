@@ -4,7 +4,7 @@ import "./globals.css";
 
 const vvSans = Noto_Sans_JP({
   variable: "--font-vv-sans",
-  subsets: ["latin", "japanese"],
+  subsets: ["latin", "vietnamese"],
   weight: ["400", "500", "700"],
 });
 
