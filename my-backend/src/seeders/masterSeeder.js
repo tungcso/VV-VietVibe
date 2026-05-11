@@ -10,11 +10,7 @@ try {
 
 const { User, Place, Level } = require('../models');
 
-const MONGO_URI = process.env.MONGO_URI;
-if (!MONGO_URI) {
-  console.error('Missing MONGO_URI in environment. Set it in .env or the environment before running this script.');
-  process.exit(1);
-}
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/vietvibe_db';
 
 const levels = [
   {
