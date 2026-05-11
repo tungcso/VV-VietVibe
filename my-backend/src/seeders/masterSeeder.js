@@ -66,6 +66,21 @@ const places = [
     name_ja: 'バス停',
     description: 'Hỏi đường và di chuyển bằng phương tiện công cộng.',
   },
+    {
+    name_vi: 'Tiệm làm đẹp',
+    name_ja: '美容室',
+    description: 'Giao tiếp khi cắt tóc và dịch vụ chăm sóc tại tiệm.',
+  },
+  {
+    name_vi: 'Ngân hàng',
+    name_ja: '銀行',
+    description: 'Các giao dịch tài chính và hành chính tại ngân hàng.',
+  },
+  {
+    name_vi: 'Taxi',
+    name_ja: 'タクシー',
+    description: 'Giao tiếp với tài xế taxi và di chuyển trong thành phố.',
+  },
 ];
 
 const adminUser = {
