@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 type PlayMode = "study" | "continuous";
 type AmbientSound = "cafe" | "road" | "market" | "office" | "off";
@@ -59,13 +59,93 @@ const ambientOptions: Array<{ id: AmbientSound; label: string }> = [
   { id: "off", label: "オフ" },
 ];
 
+const SETTINGS_STORAGE_KEY = "vv-listening-settings";
+
+interface StoredSettings {
+  speed: (typeof speeds)[number];
+  playMode: PlayMode;
+  ambientSound: AmbientSound;
+  ambientVolume: number;
+}
+
 export default function ListeningScreen() {
+  // Persisted settings (applied immediately)
   const [speed, setSpeed] = useState<(typeof speeds)[number]>("1.0x");
   const [playMode, setPlayMode] = useState<PlayMode>("study");
+  
+  // Temporary settings (only used in modal, applied on save)
+  const [tempAmbientSound, setTempAmbientSound] = useState<AmbientSound>("cafe");
+  const [tempAmbientVolume, setTempAmbientVolume] = useState(40);
+  
+  // Actual applied settings
   const [ambientSound, setAmbientSound] = useState<AmbientSound>("cafe");
   const [ambientVolume, setAmbientVolume] = useState(40);
+  
   const [currentIndex, setCurrentIndex] = useState(1);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (stored) {
+      try {
+        const settings: StoredSettings = JSON.parse(stored);
+        setSpeed(settings.speed);
+        setPlayMode(settings.playMode);
+        setAmbientSound(settings.ambientSound);
+        setAmbientVolume(settings.ambientVolume);
+        setTempAmbientSound(settings.ambientSound);
+        setTempAmbientVolume(settings.ambientVolume);
+      } catch (error) {
+        console.error("Failed to load settings:", error);
+      }
+    }
+  }, []);
+
+  // Persist settings whenever they change
+  const persistSettings = (
+    newSpeed: (typeof speeds)[number],
+    newPlayMode: PlayMode,
+    newAmbientSound: AmbientSound,
+    newAmbientVolume: number,
+  ) => {
+    const settings: StoredSettings = {
+      speed: newSpeed,
+      playMode: newPlayMode,
+      ambientSound: newAmbientSound,
+      ambientVolume: newAmbientVolume,
+    };
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  };
+
+  // Handle speed change (immediate, no reset of progress)
+  const handleSpeedChange = (newSpeed: (typeof speeds)[number]) => {
+    setSpeed(newSpeed);
+    persistSettings(newSpeed, playMode, ambientSound, ambientVolume);
+    // Audio playback rate update happens in actual audio player implementation
+  };
+
+  // Handle settings modal save
+  const handleSettingsSave = () => {
+    setAmbientSound(tempAmbientSound);
+    setAmbientVolume(tempAmbientVolume);
+    persistSettings(speed, playMode, tempAmbientSound, tempAmbientVolume);
+    setIsSettingsOpen(false);
+  };
+
+  // Handle settings modal cancel
+  const handleSettingsCancel = () => {
+    // Reset temporary settings to current values
+    setTempAmbientSound(ambientSound);
+    setTempAmbientVolume(ambientVolume);
+    setIsSettingsOpen(false);
+  };
+
+  // Update playMode and persist
+  const handlePlayModeChange = (newMode: PlayMode) => {
+    setPlayMode(newMode);
+    persistSettings(speed, newMode, ambientSound, ambientVolume);
+  };
 
   const currentLine = conversationLines[currentIndex];
 
@@ -105,29 +185,30 @@ export default function ListeningScreen() {
               </button>
             </div>
 
-            <div className="mt-4">
+            {/* Play Mode Selection */}
+            <div className="mt-5">
               <p className="text-xs font-semibold text-(--vv-muted)">
                 再生モード
               </p>
-              <div className="mt-3 flex rounded-full bg-(--vv-border) p-1 text-xs font-semibold">
+              <div className="mt-3 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setPlayMode("study")}
-                  className={`flex-1 rounded-full px-3 py-2 transition ${
+                  onClick={() => handlePlayModeChange("study")}
+                  className={`flex-1 rounded-3xl px-5 py-3 text-sm font-semibold transition ${
                     playMode === "study"
                       ? "bg-(--vv-accent-strong) text-white"
-                      : "text-(--vv-muted)"
+                      : "bg-(--vv-border) text-(--vv-muted)"
                   }`}
                 >
                   学習モード
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPlayMode("continuous")}
-                  className={`flex-1 rounded-full px-3 py-2 transition ${
+                  onClick={() => handlePlayModeChange("continuous")}
+                  className={`flex-1 rounded-3xl px-5 py-3 text-sm font-semibold transition ${
                     playMode === "continuous"
                       ? "bg-(--vv-accent-strong) text-white"
-                      : "text-(--vv-muted)"
+                      : "bg-(--vv-border) text-(--vv-muted)"
                   }`}
                 >
                   連続再生
@@ -135,19 +216,20 @@ export default function ListeningScreen() {
               </div>
             </div>
 
-            <div className="mt-5">
+            {/* Ambient Sound Selection (Temporary) */}
+            <div className="mt-6">
               <p className="text-xs font-semibold text-(--vv-muted)">
                 環境音の練習
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {ambientOptions.map((option) => {
-                  const isActive = ambientSound === option.id;
+                  const isActive = tempAmbientSound === option.id;
                   return (
                     <button
                       key={option.id}
                       type="button"
-                      onClick={() => setAmbientSound(option.id)}
-                      className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                      onClick={() => setTempAmbientSound(option.id)}
+                      className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
                         isActive
                           ? "bg-(--vv-accent-soft) text-(--vv-accent-strong)"
                           : "bg-(--vv-border) text-(--vv-muted)"
@@ -160,34 +242,40 @@ export default function ListeningScreen() {
               </div>
             </div>
 
-            <div className="mt-5">
-              <p className="text-xs font-semibold text-(--vv-muted)">
-                環境音の音量
-              </p>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={ambientVolume}
-                onChange={(event) =>
-                  setAmbientVolume(Number(event.target.value))
-                }
-                className="vv-range mt-3"
-              />
-            </div>
+            {/* Ambient Sound Volume (Temporary) - Only show when not "off" */}
+            {tempAmbientSound !== "off" && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-(--vv-muted)">
+                    環境音の音量
+                  </p>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={tempAmbientVolume}
+                  onChange={(event) =>
+                    setTempAmbientVolume(Number(event.target.value))
+                  }
+                  className="vv-range w-full"
+                />
+              </div>
+            )}
 
-            <div className="mt-6 flex gap-3">
+            {/* Save / Cancel Buttons */}
+            <div className="mt-8 flex gap-3">
               <button
                 type="button"
-                onClick={() => setIsSettingsOpen(false)}
-                className="flex-1 rounded-full bg-(--vv-border) px-4 py-2 text-xs font-semibold text-(--vv-muted)"
+                onClick={handleSettingsCancel}
+                className="flex-1 rounded-full bg-(--vv-border) px-4 py-3 text-sm font-semibold text-(--vv-muted) transition hover:bg-(--vv-border)/80"
               >
                 キャンセル
               </button>
               <button
                 type="button"
-                onClick={() => setIsSettingsOpen(false)}
-                className="flex-1 rounded-full bg-(--vv-accent-strong) px-4 py-2 text-xs font-semibold text-white"
+                onClick={handleSettingsSave}
+                className="flex-1 rounded-full bg-(--vv-accent-strong) px-4 py-3 text-sm font-semibold text-white transition hover:bg-(--vv-accent-strong)/90"
               >
                 保存
               </button>
@@ -229,29 +317,39 @@ export default function ListeningScreen() {
             <ChevronDownIcon className="h-4 w-4" />
           </button>
 
-          {speeds.map((item) => {
-            const isActive = item === speed;
-            return (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setSpeed(item)}
-                className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-                  isActive
-                    ? "bg-(--vv-accent-strong) text-white"
-                    : "bg-white text-(--vv-muted) ring-1 ring-(--vv-border)"
-                }`}
-              >
-                {item}
-              </button>
-            );
-          })}
+          {/* Speed Control Buttons */}
+          <div className="flex items-center gap-2 rounded-full bg-white ring-1 ring-(--vv-border) p-1">
+            {speeds.map((item) => {
+              const isActive = item === speed;
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => handleSpeedChange(item)}
+                  title={
+                    item === "0.75x"
+                      ? "通常より25%遅い速度"
+                      : "通常の速度"
+                  }
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    isActive
+                      ? "bg-(--vv-accent-strong) text-white"
+                      : "text-(--vv-muted) hover:text-(--vv-accent-strong)"
+                  }`}
+                >
+                  {item}
+                </button>
+              );
+            })}
+          </div>
 
+          {/* Settings Button */}
           <button
             type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white ring-1 ring-(--vv-border)"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white ring-1 ring-(--vv-border) transition hover:bg-(--vv-border)/20"
             aria-label="Settings"
+            title="再生設定を開く"
           >
             <SettingsIcon className="h-5 w-5 text-(--vv-muted)" />
           </button>
