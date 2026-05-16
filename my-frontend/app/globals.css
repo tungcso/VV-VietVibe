@@ -74,6 +74,40 @@ body {
   font-family: var(--font-vv-display);
 }
 
+.vv-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: #dfe7e2;
+  outline: none;
+}
+
+.vv-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 18px;
+  width: 18px;
+  border-radius: 999px;
+  background: var(--vv-accent-strong);
+  box-shadow: 0 6px 12px rgba(35, 70, 60, 0.2);
+}
+
+.vv-range::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #dfe7e2;
+}
+
+.vv-range::-moz-range-thumb {
+  height: 18px;
+  width: 18px;
+  border-radius: 999px;
+  border: none;
+  background: var(--vv-accent-strong);
+  box-shadow: 0 6px 12px rgba(35, 70, 60, 0.2);
+}
+
 @keyframes vv-fade-in {
   from {
     opacity: 0;
