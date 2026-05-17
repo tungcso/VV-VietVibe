@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const { Types } = mongoose;
 
 const { ListeningLesson, TranscriptLine } = models;
+const { LearningUnit } = models;
 
 @Injectable()
 export class ListeningService {
@@ -52,6 +53,11 @@ export class ListeningService {
   }
 
   async createListeningLesson(createDto: CreateListeningDto) {
+    const learningUnit = await LearningUnit.findById(createDto.learningUnitId);
+    if (!learningUnit) {
+      throw new NotFoundException('Learning unit not found');
+    }
+
     const lesson = await ListeningLesson.create({
       learning_unit_id: createDto.learningUnitId,
       title_vi: createDto.titleVi,
@@ -78,6 +84,13 @@ export class ListeningService {
   async updateListeningLesson(id: string, updateDto: UpdateListeningDto) {
     const updatePayload: Record<string, unknown> = {};
     if (updateDto.learningUnitId) {
+      const learningUnit = await LearningUnit.findById(
+        updateDto.learningUnitId,
+      );
+      if (!learningUnit) {
+        throw new NotFoundException('Learning unit not found');
+      }
+
       updatePayload.learning_unit_id = updateDto.learningUnitId;
     }
     if (updateDto.titleVi !== undefined) {

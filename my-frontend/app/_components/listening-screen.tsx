@@ -49,9 +49,11 @@ interface StoredSettings {
 
 export default function ListeningScreen() {
   const searchParams = useSearchParams();
+  const learningUnitId = searchParams.get("learningUnitId");
   // Persisted settings (applied immediately)
   const [speed, setSpeed] = useState<(typeof speeds)[number]>("1.0x");
   const [playMode, setPlayMode] = useState<PlayMode>("study");
+  const [showJapanese, setShowJapanese] = useState(true);
 
   // Temporary settings (only used in modal, applied on save)
   const [tempAmbientSound, setTempAmbientSound] =
@@ -94,8 +96,6 @@ export default function ListeningScreen() {
       try {
         setLoading(true);
         setLoadError(null);
-
-        const learningUnitId = searchParams.get("learningUnitId");
 
         let selectedLesson: ListeningLesson | null = null;
 
@@ -210,7 +210,7 @@ export default function ListeningScreen() {
     return () => {
       mounted = false;
     };
-  }, [searchParams]);
+  }, [learningUnitId]);
 
   // Persist settings whenever they change
   const persistSettings = (
@@ -523,7 +523,7 @@ export default function ListeningScreen() {
                 {currentLine.textVi}
               </p>
               <p className="mt-2 text-xs text-(--vv-muted)">
-                {currentLine.textJa}
+                {showJapanese ? currentLine.textJa : ""}
               </p>
             </>
           ) : (
@@ -585,7 +585,7 @@ export default function ListeningScreen() {
                     {line.textVi}
                   </p>
                   <p className="mt-1 text-xs text-(--vv-muted)">
-                    {line.textJa}
+                    {showJapanese ? line.textJa : ""}
                   </p>
                 </span>
               </button>
