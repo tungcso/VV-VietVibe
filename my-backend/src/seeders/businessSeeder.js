@@ -115,9 +115,9 @@ async function seedBusinessData() {
     // B5: Tạo ListeningLesson
     console.log('\n7. [B5] Đang tạo ListeningLesson (Bài nghe)...');
     const listeningLesson = await ListeningLesson.create({
-      title_vi: 'Hội thoại thanh toán tại nhà hàng',
-      title_ja: 'レストランでの支払い会話',
-      audio_url: '/audios/payment_restaurant.mp3',
+      title_vi: 'Hội thoại gọi phở',
+      title_ja: 'フォーを注文する会話',
+      audio_url: '/audios/pho_order.mp3',
       duration_seconds: 45,
       learning_unit_id: learningUnit._id,
     });
