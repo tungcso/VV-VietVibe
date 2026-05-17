@@ -144,14 +144,10 @@ export default function ListeningScreen() {
             );
           }
 
-          // Prefer the 'Thanh toán' lesson if present, otherwise fall back to first
           const lessonsArray: any[] = Array.isArray(listJson) ? listJson : [];
-          const preferred = lessonsArray.find((l: any) => {
-            const title = String(l.title_vi ?? l.titleVi ?? "").toLowerCase();
-            return title.includes("thanh toán") || title.includes("payment");
-          });
-
-          const chosen = preferred || lessonsArray[0] || null;
+          // Pick by lesson order instead of title: use the second lesson if it exists.
+          // With the current seed data, this is the payment lesson.
+          const chosen = lessonsArray[1] || lessonsArray[0] || null;
           if (!chosen) {
             throw new Error("No listening lessons found");
           }
