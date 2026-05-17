@@ -15,6 +15,7 @@ async function bootstrap() {
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
+      skipMissingProperties: false,
       exceptionFactory: (errors) => {
         const messages = errors
           .map((error) => {
@@ -45,6 +46,15 @@ async function bootstrap() {
     .setDescription('Danh sách API cho VietVibe Project')
     .setVersion('1.0')
     .addTag('vietvibe')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'JWT token. Get from /auth/login or /auth/register',
+      },
+      'access_token',
+    )
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
