@@ -47,7 +47,6 @@ async function fetchVocabCards(): Promise<VocabCard[]> {
 export default function VocabScreen() {
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [mode, setMode] = useState<StudyMode>("vocab");
 
   const [cards, setCards] = useState<VocabCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,28 +118,19 @@ export default function VocabScreen() {
               </p>
             </div>
             <div className="flex rounded-full bg-(--vv-border) p-1 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setMode("vocab")}
-                className={`rounded-full px-3 py-1 transition ${
-                  mode === "vocab"
-                    ? "bg-white text-(--vv-accent-strong)"
-                    : "text-(--vv-muted)"
-                }`}
+              <Link
+                href="/vocab"
+                aria-current="page"
+                className="rounded-full bg-white px-3 py-1 text-(--vv-accent-strong) transition"
               >
                 語彙
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("listening")}
-                className={`rounded-full px-3 py-1 transition ${
-                  mode === "listening"
-                    ? "bg-white text-(--vv-accent-strong)"
-                    : "text-(--vv-muted)"
-                }`}
+              </Link>
+              <Link
+                href="/listening"
+                className="rounded-full px-3 py-1 text-(--vv-muted) transition hover:text-(--vv-accent-strong)"
               >
                 聞き取り
-              </button>
+              </Link>
             </div>
           </div>
           {loading ? (
