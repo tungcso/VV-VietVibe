@@ -6,6 +6,7 @@ import { Product, ProductSchema } from './schemas/product.schema.js'; // Import 
 import { UsersModule } from './users/users.module.js';
 import { VocabularyModule } from './vocabulary/vocabulary.module.js';
 import { LoginModule } from './login/login.module.js';
+import { ListeningModule } from './listening/listening.module.js';
 import { MONGO_URI } from './config/env.js';
 
 @Module({
@@ -16,6 +17,7 @@ import { MONGO_URI } from './config/env.js';
     UsersModule,
     VocabularyModule,
     LoginModule,
+    ListeningModule,
   ],
   controllers: [AppController],
   providers: [AppService],
