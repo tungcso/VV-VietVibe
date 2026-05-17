@@ -427,9 +427,11 @@ export default function ListeningScreen() {
         <div className="flex flex-wrap items-center gap-3 vv-rise-in vv-delay-2">
           <button
             type="button"
+            onClick={() => setShowJapanese((prev) => !prev)}
+            aria-pressed={showJapanese}
             className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-(--vv-muted) ring-1 ring-(--vv-border)"
           >
-            日本語
+            {showJapanese ? "日本語" : "日本語を隠す"}
             <ChevronDownIcon className="h-4 w-4" />
           </button>
 
