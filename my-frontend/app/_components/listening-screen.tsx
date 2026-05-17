@@ -1,55 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 type PlayMode = "study" | "continuous";
 type AmbientSound = "cafe" | "road" | "market" | "office" | "off";
 
 const speeds = ["0.75x", "1.0x"] as const;
 
-const conversationLines = [
-  {
-    id: "line-1",
-    vi: "Xin chào, tôi cần thanh toán.",
-    ja: "すみません、会計をお願いします。",
-  },
-  {
-    id: "line-2",
-    vi: "Tôi muốn trả bằng tiền mặt.",
-    ja: "現金で支払いたいです。",
-  },
-  {
-    id: "line-3",
-    vi: "Bạn có thể xuất hóa đơn không?",
-    ja: "領収書を発行してもらえますか？",
-  },
-  {
-    id: "line-4",
-    vi: "Bạn nhận thẻ tín dụng không?",
-    ja: "クレジットカードは使えますか？",
-  },
-  {
-    id: "line-5",
-    vi: "Tôi có thể thanh toán bằng QR không?",
-    ja: "QR で支払えますか？",
-  },
-  {
-    id: "line-6",
-    vi: "Cho tôi một túi nhé.",
-    ja: "袋をください。",
-  },
-  {
-    id: "line-7",
-    vi: "Tôi quên mã PIN.",
-    ja: "暗証番号を忘れました。",
-  },
-  {
-    id: "line-8",
-    vi: "Cảm ơn, hẹn gặp lại.",
-    ja: "ありがとう、またね。",
-  },
-];
+type TranscriptLine = {
+  id: string;
+  startTime: number;
+  endTime: number;
+  textVi: string;
+  textJa: string;
+};
+
+type ListeningLesson = {
+  id: string;
+  learningUnitId: string;
+  titleVi: string;
+  titleJa: string;
+  audioUrl: string;
+  durationSeconds: number;
+  description?: string | null;
+  transcriptLines: TranscriptLine[];
+};
 
 const ambientOptions: Array<{ id: AmbientSound; label: string }> = [
   { id: "cafe", label: "カフェ" },
@@ -59,23 +36,239 @@ const ambientOptions: Array<{ id: AmbientSound; label: string }> = [
   { id: "off", label: "オフ" },
 ];
 
+const SETTINGS_STORAGE_KEY = "vv-listening-settings";
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+
+interface StoredSettings {
+  speed: (typeof speeds)[number];
+  playMode: PlayMode;
+  ambientSound: AmbientSound;
+  ambientVolume: number;
+}
+
 export default function ListeningScreen() {
+  const searchParams = useSearchParams();
+  // Persisted settings (applied immediately)
   const [speed, setSpeed] = useState<(typeof speeds)[number]>("1.0x");
   const [playMode, setPlayMode] = useState<PlayMode>("study");
+
+  // Temporary settings (only used in modal, applied on save)
+  const [tempAmbientSound, setTempAmbientSound] =
+    useState<AmbientSound>("cafe");
+  const [tempAmbientVolume, setTempAmbientVolume] = useState(40);
+
+  // Actual applied settings
   const [ambientSound, setAmbientSound] = useState<AmbientSound>("cafe");
   const [ambientVolume, setAmbientVolume] = useState(40);
+
   const [currentIndex, setCurrentIndex] = useState(1);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [showJapanese, setShowJapanese] = useState(true);
+  const [lesson, setLesson] = useState<ListeningLesson | null>(null);
+  const [lines, setLines] = useState<TranscriptLine[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const currentLine = conversationLines[currentIndex];
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (stored) {
+      try {
+        const settings: StoredSettings = JSON.parse(stored);
+        setSpeed(settings.speed);
+        setPlayMode(settings.playMode);
+        setAmbientSound(settings.ambientSound);
+        setAmbientVolume(settings.ambientVolume);
+        setTempAmbientSound(settings.ambientSound);
+        setTempAmbientVolume(settings.ambientVolume);
+      } catch (error) {
+        console.error("Failed to load settings:", error);
+      }
+    }
+  }, []);
 
-  const goPrev = () =>
-    setCurrentIndex((prev) => Math.max(prev - 1, 0));
+  useEffect(() => {
+    let mounted = true;
+
+    const loadLesson = async () => {
+      try {
+        setLoading(true);
+        setLoadError(null);
+
+        const learningUnitId = searchParams.get("learningUnitId");
+
+        let selectedLesson: ListeningLesson | null = null;
+
+        if (learningUnitId) {
+          const detailRes = await fetch(
+            `${BACKEND_URL}/listening/learning-unit/${learningUnitId}`,
+          );
+          const detailJson = await detailRes.json();
+
+          if (!detailRes.ok) {
+            throw new Error(
+              detailJson?.message ||
+                detailJson?.error ||
+                `HTTP ${detailRes.status}`,
+            );
+          }
+
+          selectedLesson = {
+            id: String(detailJson._id ?? detailJson.id),
+            learningUnitId: String(
+              detailJson.learning_unit_id ?? detailJson.learningUnitId,
+            ),
+            titleVi: detailJson.title_vi ?? detailJson.titleVi ?? "",
+            titleJa: detailJson.title_ja ?? detailJson.titleJa ?? "",
+            audioUrl: detailJson.audio_url ?? detailJson.audioUrl ?? "",
+            durationSeconds:
+              detailJson.duration_seconds ?? detailJson.durationSeconds ?? 0,
+            description: detailJson.description ?? null,
+            transcriptLines: Array.isArray(detailJson.transcriptLines)
+              ? detailJson.transcriptLines.map((line: any, index: number) => ({
+                  id: String(line._id ?? line.id ?? `${index}`),
+                  startTime: line.start_time ?? line.startTime ?? 0,
+                  endTime: line.end_time ?? line.endTime ?? 0,
+                  textVi: line.text_vi ?? line.textVi ?? "",
+                  textJa: line.text_ja ?? line.textJa ?? "",
+                }))
+              : [],
+          };
+        } else {
+          const listRes = await fetch(`${BACKEND_URL}/listening`);
+          const listJson = await listRes.json();
+
+          if (!listRes.ok) {
+            throw new Error(
+              listJson?.message || listJson?.error || `HTTP ${listRes.status}`,
+            );
+          }
+
+          const lessonsArray: any[] = Array.isArray(listJson) ? listJson : [];
+          // Pick by lesson order instead of title: use the second lesson if it exists.
+          // With the current seed data, this is the payment lesson.
+          const chosen = lessonsArray[1] || lessonsArray[0] || null;
+          if (!chosen) {
+            throw new Error("No listening lessons found");
+          }
+
+          const id = String(chosen._id ?? chosen.id);
+          const detailRes = await fetch(`${BACKEND_URL}/listening/${id}`);
+          const detailJson = await detailRes.json();
+
+          if (!detailRes.ok) {
+            throw new Error(
+              detailJson?.message ||
+                detailJson?.error ||
+                `HTTP ${detailRes.status}`,
+            );
+          }
+
+          selectedLesson = {
+            id: String(detailJson._id ?? detailJson.id),
+            learningUnitId: String(
+              detailJson.learning_unit_id ?? detailJson.learningUnitId,
+            ),
+            titleVi: detailJson.title_vi ?? detailJson.titleVi ?? "",
+            titleJa: detailJson.title_ja ?? detailJson.titleJa ?? "",
+            audioUrl: detailJson.audio_url ?? detailJson.audioUrl ?? "",
+            durationSeconds:
+              detailJson.duration_seconds ?? detailJson.durationSeconds ?? 0,
+            description: detailJson.description ?? null,
+            transcriptLines: Array.isArray(detailJson.transcriptLines)
+              ? detailJson.transcriptLines.map((line: any, index: number) => ({
+                  id: String(line._id ?? line.id ?? `${index}`),
+                  startTime: line.start_time ?? line.startTime ?? 0,
+                  endTime: line.end_time ?? line.endTime ?? 0,
+                  textVi: line.text_vi ?? line.textVi ?? "",
+                  textJa: line.text_ja ?? line.textJa ?? "",
+                }))
+              : [],
+          };
+        }
+
+        if (!mounted) return;
+
+        setLesson(selectedLesson);
+        setLines(selectedLesson?.transcriptLines ?? []);
+        setCurrentIndex(0);
+      } catch (error: any) {
+        if (!mounted) return;
+        console.error("Failed to load listening lesson:", error);
+        setLoadError(error?.message || "Failed to load listening lesson");
+        setLesson(null);
+        setLines([]);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadLesson();
+
+    return () => {
+      mounted = false;
+    };
+  }, [searchParams]);
+
+  // Persist settings whenever they change
+  const persistSettings = (
+    newSpeed: (typeof speeds)[number],
+    newPlayMode: PlayMode,
+    newAmbientSound: AmbientSound,
+    newAmbientVolume: number,
+  ) => {
+    const settings: StoredSettings = {
+      speed: newSpeed,
+      playMode: newPlayMode,
+      ambientSound: newAmbientSound,
+      ambientVolume: newAmbientVolume,
+    };
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  };
+
+  // Handle speed change (immediate, no reset of progress)
+  const handleSpeedChange = (newSpeed: (typeof speeds)[number]) => {
+    setSpeed(newSpeed);
+    persistSettings(newSpeed, playMode, ambientSound, ambientVolume);
+    // Audio playback rate update happens in actual audio player implementation
+  };
+
+  // Handle settings modal save
+  const handleSettingsSave = () => {
+    setAmbientSound(tempAmbientSound);
+    setAmbientVolume(tempAmbientVolume);
+    persistSettings(speed, playMode, tempAmbientSound, tempAmbientVolume);
+    setIsSettingsOpen(false);
+  };
+
+  // Handle settings modal cancel
+  const handleSettingsCancel = () => {
+    // Reset temporary settings to current values
+    setTempAmbientSound(ambientSound);
+    setTempAmbientVolume(ambientVolume);
+    setIsSettingsOpen(false);
+  };
+
+  // Update playMode and persist
+  const handlePlayModeChange = (newMode: PlayMode) => {
+    setPlayMode(newMode);
+    persistSettings(speed, newMode, ambientSound, ambientVolume);
+  };
+
+  const currentLine = lines[currentIndex];
+  const lessonDuration = lesson?.durationSeconds ?? 0;
+
+  const goPrev = () => setCurrentIndex((prev) => Math.max(prev - 1, 0));
   const goNext = () =>
-    setCurrentIndex((prev) =>
-      Math.min(prev + 1, conversationLines.length - 1),
-    );
+    setCurrentIndex((prev) => Math.min(prev + 1, lines.length - 1));
+
+  const formatSeconds = (totalSeconds: number) => {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  };
 
   return (
     <div className="min-h-screen w-full bg-linear-to-b from-[#f8f6f2] via-[#f3f7f3] to-[#ecf2ee]">
@@ -106,29 +299,30 @@ export default function ListeningScreen() {
               </button>
             </div>
 
-            <div className="mt-4">
+            {/* Play Mode Selection */}
+            <div className="mt-5">
               <p className="text-xs font-semibold text-(--vv-muted)">
                 再生モード
               </p>
-              <div className="mt-3 flex rounded-full bg-(--vv-border) p-1 text-xs font-semibold">
+              <div className="mt-3 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setPlayMode("study")}
-                  className={`flex-1 rounded-full px-3 py-2 transition ${
+                  onClick={() => handlePlayModeChange("study")}
+                  className={`flex-1 rounded-3xl px-5 py-3 text-sm font-semibold transition ${
                     playMode === "study"
                       ? "bg-(--vv-accent-strong) text-white"
-                      : "text-(--vv-muted)"
+                      : "bg-(--vv-border) text-(--vv-muted)"
                   }`}
                 >
                   学習モード
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPlayMode("continuous")}
-                  className={`flex-1 rounded-full px-3 py-2 transition ${
+                  onClick={() => handlePlayModeChange("continuous")}
+                  className={`flex-1 rounded-3xl px-5 py-3 text-sm font-semibold transition ${
                     playMode === "continuous"
                       ? "bg-(--vv-accent-strong) text-white"
-                      : "text-(--vv-muted)"
+                      : "bg-(--vv-border) text-(--vv-muted)"
                   }`}
                 >
                   連続再生
@@ -136,19 +330,20 @@ export default function ListeningScreen() {
               </div>
             </div>
 
-            <div className="mt-5">
+            {/* Ambient Sound Selection (Temporary) */}
+            <div className="mt-6">
               <p className="text-xs font-semibold text-(--vv-muted)">
                 環境音の練習
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {ambientOptions.map((option) => {
-                  const isActive = ambientSound === option.id;
+                  const isActive = tempAmbientSound === option.id;
                   return (
                     <button
                       key={option.id}
                       type="button"
-                      onClick={() => setAmbientSound(option.id)}
-                      className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                      onClick={() => setTempAmbientSound(option.id)}
+                      className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
                         isActive
                           ? "bg-(--vv-accent-soft) text-(--vv-accent-strong)"
                           : "bg-(--vv-border) text-(--vv-muted)"
@@ -161,34 +356,40 @@ export default function ListeningScreen() {
               </div>
             </div>
 
-            <div className="mt-5">
-              <p className="text-xs font-semibold text-(--vv-muted)">
-                環境音の音量
-              </p>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={ambientVolume}
-                onChange={(event) =>
-                  setAmbientVolume(Number(event.target.value))
-                }
-                className="vv-range mt-3"
-              />
-            </div>
+            {/* Ambient Sound Volume (Temporary) - Only show when not "off" */}
+            {tempAmbientSound !== "off" && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-(--vv-muted)">
+                    環境音の音量
+                  </p>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={tempAmbientVolume}
+                  onChange={(event) =>
+                    setTempAmbientVolume(Number(event.target.value))
+                  }
+                  className="vv-range w-full"
+                />
+              </div>
+            )}
 
-            <div className="mt-6 flex gap-3">
+            {/* Save / Cancel Buttons */}
+            <div className="mt-8 flex gap-3">
               <button
                 type="button"
-                onClick={() => setIsSettingsOpen(false)}
-                className="flex-1 rounded-full bg-(--vv-border) px-4 py-2 text-xs font-semibold text-(--vv-muted)"
+                onClick={handleSettingsCancel}
+                className="flex-1 rounded-full bg-(--vv-border) px-4 py-3 text-sm font-semibold text-(--vv-muted) transition hover:bg-(--vv-border)/80"
               >
                 キャンセル
               </button>
               <button
                 type="button"
-                onClick={() => setIsSettingsOpen(false)}
-                className="flex-1 rounded-full bg-(--vv-accent-strong) px-4 py-2 text-xs font-semibold text-white"
+                onClick={handleSettingsSave}
+                className="flex-1 rounded-full bg-(--vv-accent-strong) px-4 py-3 text-sm font-semibold text-white transition hover:bg-(--vv-accent-strong)/90"
               >
                 保存
               </button>
@@ -200,12 +401,14 @@ export default function ListeningScreen() {
       <div className="mx-auto flex w-full max-w-105 flex-col gap-5 px-4 pb-10 pt-6">
         <div className="vv-rise-in">
           <p className="text-xs font-semibold text-(--vv-muted)">
-            スーパー / レジで支払う
+            {lesson?.titleVi ?? "スーパー / レジで支払う"}
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">
             聞き取り
           </h1>
-          <p className="mt-1 text-xs text-(--vv-muted)">会話</p>
+          <p className="mt-1 text-xs text-(--vv-muted)">
+            {lesson?.titleJa ?? "会話"}
+          </p>
         </div>
 
         <div className="flex items-center gap-6 border-b border-(--vv-border) text-sm font-semibold vv-rise-in vv-delay-1">
@@ -232,33 +435,51 @@ export default function ListeningScreen() {
             <ChevronDownIcon className="h-4 w-4" />
           </button>
 
-          {speeds.map((item) => {
-            const isActive = item === speed;
-            return (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setSpeed(item)}
-                className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-                  isActive
-                    ? "bg-(--vv-accent-strong) text-white"
-                    : "bg-white text-(--vv-muted) ring-1 ring-(--vv-border)"
-                }`}
-              >
-                {item}
-              </button>
-            );
-          })}
+          {/* Speed Control Buttons */}
+          <div className="flex items-center gap-2 rounded-full bg-white ring-1 ring-(--vv-border) p-1">
+            {speeds.map((item) => {
+              const isActive = item === speed;
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => handleSpeedChange(item)}
+                  title={
+                    item === "0.75x" ? "通常より25%遅い速度" : "通常の速度"
+                  }
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    isActive
+                      ? "bg-(--vv-accent-strong) text-white"
+                      : "text-(--vv-muted) hover:text-(--vv-accent-strong)"
+                  }`}
+                >
+                  {item}
+                </button>
+              );
+            })}
+          </div>
 
+          {/* Settings Button */}
           <button
             type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white ring-1 ring-(--vv-border)"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white ring-1 ring-(--vv-border) transition hover:bg-(--vv-border)/20"
             aria-label="Settings"
+            title="再生設定を開く"
           >
             <SettingsIcon className="h-5 w-5 text-(--vv-muted)" />
           </button>
         </div>
+
+        {loading ? (
+          <div className="rounded-3xl bg-white/90 p-4 text-center text-sm text-(--vv-muted) ring-1 ring-(--vv-ring)">
+            読み込み中...
+          </div>
+        ) : loadError ? (
+          <div className="rounded-3xl bg-white/90 p-4 text-center text-sm text-red-600 ring-1 ring-(--vv-ring)">
+            {loadError}
+          </div>
+        ) : null}
 
         <div className="rounded-3xl bg-[#cfeee3] p-4 shadow-[0_12px_24px_rgba(35,70,60,0.12)] vv-rise-in vv-delay-3">
           <div className="flex items-center gap-4">
@@ -271,22 +492,45 @@ export default function ListeningScreen() {
             </button>
             <div className="flex-1">
               <div className="h-2 w-full rounded-full bg-white/70">
-                <div className="h-full w-[25%] rounded-full bg-(--vv-accent-strong)" />
+                <div
+                  className="h-full rounded-full bg-(--vv-accent-strong)"
+                  style={{
+                    width:
+                      lines.length > 0
+                        ? `${Math.max(
+                            8,
+                            Math.min(
+                              100,
+                              ((currentIndex + 1) / lines.length) * 100,
+                            ),
+                          )}%`
+                        : "8%",
+                  }}
+                />
               </div>
             </div>
             <span className="text-xs font-semibold text-(--vv-accent-strong)">
-              0:13 / 1:08
+              {formatSeconds(currentLine?.endTime ?? 0)} /{" "}
+              {formatSeconds(lessonDuration)}
             </span>
           </div>
         </div>
 
         <div className="rounded-3xl bg-white/90 p-4 shadow-[0_12px_24px_rgba(31,43,39,0.08)] ring-1 ring-(--vv-ring)">
-          <p className="text-sm font-semibold text-foreground">
-            {currentLine.vi}
-          </p>
-          {showJapanese ? (
-            <p className="mt-2 text-xs text-(--vv-muted)">{currentLine.ja}</p>
-          ) : null}
+          {currentLine ? (
+            <>
+              <p className="text-sm font-semibold text-foreground">
+                {currentLine.textVi}
+              </p>
+              <p className="mt-2 text-xs text-(--vv-muted)">
+                {currentLine.textJa}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-(--vv-muted)">
+              会話データがありません。
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-between">
@@ -300,12 +544,12 @@ export default function ListeningScreen() {
             前の文
           </button>
           <span className="text-xs font-semibold text-(--vv-muted)">
-            {currentIndex + 1} / {conversationLines.length}
+            {lines.length === 0 ? 0 : currentIndex + 1} / {lines.length}
           </span>
           <button
             type="button"
             onClick={goNext}
-            disabled={currentIndex === conversationLines.length - 1}
+            disabled={currentIndex === lines.length - 1 || lines.length === 0}
             className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-(--vv-muted) ring-1 ring-(--vv-border) disabled:opacity-50"
           >
             次の文
@@ -314,7 +558,7 @@ export default function ListeningScreen() {
         </div>
 
         <div className="flex flex-col gap-2">
-          {conversationLines.map((line, index) => {
+          {lines.map((line, index) => {
             const isActive = index === currentIndex;
             return (
               <button
@@ -338,11 +582,11 @@ export default function ListeningScreen() {
                 </span>
                 <span className="flex-1">
                   <p className="text-sm font-semibold text-foreground">
-                    {line.vi}
+                    {line.textVi}
                   </p>
-                  {showJapanese ? (
-                    <p className="mt-1 text-xs text-(--vv-muted)">{line.ja}</p>
-                  ) : null}
+                  <p className="mt-1 text-xs text-(--vv-muted)">
+                    {line.textJa}
+                  </p>
                 </span>
               </button>
             );

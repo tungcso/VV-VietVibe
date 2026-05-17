@@ -1,56 +1,60 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 type StudyMode = "vocab" | "listening";
 
 type VocabCard = {
   id: string;
   term: string;
-  reading: string;
-  tag: string;
-  meaning: string;
-  example: string;
-  note: string;
+  reading?: string;
+  tag?: string;
+  meaning?: string;
+  example?: string;
+  note?: string;
 };
 
-const cards: VocabCard[] = [
-  {
-    id: "chemgio",
-    term: "chém gió",
-    reading: "tu vung",
-    tag: "Từ lóng",
-    meaning: "大げさに話す・ほら吹き",
-    example: "彼はいつも大げさに話すから、あまり信じないほうがいい。",
-    note: "友達同士の会話で使うカジュアルな表現。",
-  },
-  {
-    id: "dithoi",
-    term: "đi thôi",
-    reading: "tu vung",
-    tag: "Từ thông thường",
-    meaning: "行こう・出発しよう",
-    example: "もう遅いね、行こう。",
-    note: "親しい相手に使う柔らかい誘い方。",
-  },
-  {
-    id: "ngon",
-    term: "ngon",
-    reading: "tu vung",
-    tag: "Văn chương",
-    meaning: "おいしい・素晴らしい",
-    example: "このフォーは本当においしい！",
-    note: "食べ物にも会話にも使える万能表現。",
-  },
-];
+// Backend base URL (can be overridden with NEXT_PUBLIC_BACKEND_URL)
+const DEFAULT_BACKEND =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+
+async function fetchVocabCards(): Promise<VocabCard[]> {
+  try {
+    const res = await fetch(`${DEFAULT_BACKEND}/vocabulary?limit=100`);
+    const json = await res.json();
+    if (!res.ok) {
+      const msg = json?.message || json?.error || `Fetch failed: ${res.status}`;
+      throw new Error(msg);
+    }
+    // backend returns { data: [cards], meta: {...} }
+    const data = Array.isArray(json.data) ? json.data : [];
+    return data.map((c: any) => ({
+      id: c.id ?? String(c._id ?? ""),
+      term: c.wordVi ?? c.word_vi ?? c.term ?? "",
+      reading: c.learningUnit?.titleJa ?? undefined,
+      tag: c.tag ?? undefined,
+      meaning: c.meaningJa ?? c.meaning_ja ?? "",
+      example: c.exampleVi ?? c.example_vi ?? "",
+      note: c.note ?? undefined,
+    }));
+  } catch (error) {
+    console.error("Failed to load vocab cards", error);
+    return [];
+  }
+}
 
 export default function VocabScreen() {
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [mode, setMode] = useState<StudyMode>("vocab");
 
-  const card = cards[index];
+  const [cards, setCards] = useState<VocabCard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const card =
+    cards[index] ??
+    ({ id: "", term: "", meaning: "", example: "" } as VocabCard);
 
   const goNext = () => {
     setIndex((prev) => Math.min(prev + 1, cards.length - 1));
@@ -61,6 +65,27 @@ export default function VocabScreen() {
     setIndex((prev) => Math.max(prev - 1, 0));
     setFlipped(false);
   };
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    fetchVocabCards()
+      .then((result) => {
+        if (!mounted) return;
+        setCards(result);
+        setIndex(0);
+        setLoading(false);
+      })
+      .catch((err: any) => {
+        console.error(err);
+        if (!mounted) return;
+        setError(err?.message || "Failed to load vocabulary");
+        setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <div className="min-h-screen w-full bg-linear-to-b from-[#f8f6f2] via-[#f3f7f3] to-[#ecf2ee]">
@@ -76,7 +101,8 @@ export default function VocabScreen() {
             ホーム
           </Link>
           <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-(--vv-muted) ring-1 ring-(--vv-ring)">
-            カード {index + 1} / {cards.length}
+            カード {loading ? "..." : index + 1} /{" "}
+            {loading ? "..." : cards.length}
           </div>
         </header>
 
@@ -92,73 +118,79 @@ export default function VocabScreen() {
               </p>
             </div>
             <div className="flex rounded-full bg-(--vv-border) p-1 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setMode("vocab")}
-                className={`rounded-full px-3 py-1 transition ${
-                  mode === "vocab"
-                    ? "bg-white text-(--vv-accent-strong)"
-                    : "text-(--vv-muted)"
-                }`}
+              <Link
+                href="/vocab"
+                aria-current="page"
+                className="rounded-full bg-white px-3 py-1 text-(--vv-accent-strong) transition"
               >
                 語彙
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("listening")}
-                className={`rounded-full px-3 py-1 transition ${
-                  mode === "listening"
-                    ? "bg-white text-(--vv-accent-strong)"
-                    : "text-(--vv-muted)"
-                }`}
+              </Link>
+              <Link
+                href="/listening"
+                className="rounded-full px-3 py-1 text-(--vv-muted) transition hover:text-(--vv-accent-strong)"
               >
                 聞き取り
-              </button>
+              </Link>
             </div>
           </div>
-          <div
-            className="mt-6 vv-flip"
-            data-flipped={flipped}
-            onClick={() => setFlipped((prev) => !prev)}
-          >
-            <div className="relative vv-flip-inner">
-              <div className="vv-flip-side w-full rounded-3xl border border-(--vv-border) bg-white px-6 py-10 text-center shadow-[0_14px_30px_rgba(35,70,60,0.12)]">
-                <span className="inline-flex items-center rounded-full bg-(--vv-accent) px-3 py-1 text-[11px] font-semibold tracking-wide text-white">
-                  {card.tag}
-                </span>
+          {loading ? (
+            <div className="mt-6 text-center text-sm text-(--vv-muted)">
+              読み込み中...
+            </div>
+          ) : error ? (
+            <div className="mt-6 text-center text-sm text-red-600">{error}</div>
+          ) : cards.length === 0 ? (
+            <div className="mt-6 text-center text-sm text-(--vv-muted)">
+              単語が見つかりません。
+            </div>
+          ) : (
+            <div
+              className="mt-6 vv-flip"
+              data-flipped={flipped}
+              onClick={() => setFlipped((prev) => !prev)}
+            >
+              <div className="relative vv-flip-inner">
+                <div className="vv-flip-side w-full rounded-3xl border border-(--vv-border) bg-white px-6 py-10 text-center shadow-[0_14px_30px_rgba(35,70,60,0.12)]">
+                  <span className="inline-flex items-center rounded-full bg-(--vv-accent) px-3 py-1 text-[11px] font-semibold tracking-wide text-white">
+                    {card.tag}
+                  </span>
 
-                <h2 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
-                  {card.term}
-                </h2>
+                  <h2 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
+                    {card.term}
+                  </h2>
 
-                <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-(--vv-muted)">
-                  {card.reading}
-                </p>
+                  <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-(--vv-muted)">
+                    {card.reading}
+                  </p>
 
-                <p className="mt-3 text-xs text-(--vv-muted)">{card.example}</p>
+                  <p className="mt-3 text-xs text-(--vv-muted)">
+                    {card.example}
+                  </p>
 
-                <p className="mt-6 text-xs font-semibold text-(--vv-muted)">
-                  カードをタップして裏返す
-                </p>
-              </div>
-              {/* Back side */}
-              <div className="absolute inset-0 h-full w-full vv-flip-side vv-flip-back rounded-3xl border border-(--vv-border) bg-white px-6 py-8 text-left shadow-[0_14px_30px_rgba(35,70,60,0.12)]">
-                <p className="text-sm font-semibold text-(--vv-accent-strong)">
-                  {card.meaning}
-                </p>
-
-                <p className="mt-4 text-sm text-foreground">{card.note}</p>
-
-                <div className="mt-5 rounded-2xl bg-(--vv-accent-soft) p-3 text-xs text-(--vv-accent-strong)">
-                  例：{card.example}
+                  <p className="mt-6 text-xs font-semibold text-(--vv-muted)">
+                    カードをタップして裏返す
+                  </p>
                 </div>
+                {/* Back side */}
+                <div className="absolute inset-0 h-full w-full vv-flip-side vv-flip-back rounded-3xl border border-(--vv-border) bg-white px-6 py-8 text-left shadow-[0_14px_30px_rgba(35,70,60,0.12)]">
+                  <p className="text-sm font-semibold text-(--vv-accent-strong)">
+                    {card.meaning}
+                  </p>
 
-                <p className="mt-6 text-xs font-semibold text-(--vv-muted)">
-                  タップして表に戻す
-                </p>
+                  <p className="mt-4 text-sm text-foreground">{card.note}</p>
+
+                  <div className="mt-5 rounded-2xl bg-(--vv-accent-soft) p-3 text-xs text-(--vv-accent-strong)">
+                    例：{card.example}
+                  </div>
+
+                  <p className="mt-6 text-xs font-semibold text-(--vv-muted)">
+                    タップして表に戻す
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
           <div className="mt-6 flex items-center justify-between">
             <button
               type="button"

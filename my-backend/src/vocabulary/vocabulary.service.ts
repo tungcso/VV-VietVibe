@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import * as path from 'path';
 import { GetVocabularyListQueryDto } from './dto/get-vocabulary-list.query';
+import { CreateVocabularyDto } from './dto/create-vocabulary.dto';
+import { UpdateVocabularyDto } from './dto/update-vocabulary.dto';
 
 const models = require(path.resolve(__dirname, '../../src/models'));
 const mongoose = require('mongoose');
@@ -153,6 +155,184 @@ export class VocabularyService {
       data: vocabularyCards.map((card) => this.mapVocabularyCard(card)),
       meta: {
         total: vocabularyCards.length,
+      },
+    };
+  }
+
+  /**
+   * [ADMIN] Create new vocabulary card
+   */
+  async createVocabulary(createDto: CreateVocabularyDto) {
+    // Validate learning unit exists
+    const learningUnit = await LearningUnit.findById(createDto.learning_unit_id);
+    if (!learningUnit) {
+      throw new NotFoundException('Learning unit not found');
+    }
+
+    const newCard = await VocabularyCard.create({
+      learning_unit_id: createDto.learning_unit_id,
+      word_vi: createDto.word_vi.trim(),
+      meaning_ja: createDto.meaning_ja.trim(),
+      example_vi: createDto.example_vi?.trim() || null,
+      example_ja: createDto.example_ja?.trim() || null,
+      note: createDto.note?.trim() || null,
+      tag: createDto.tag?.trim() || null,
+    });
+
+    return {
+      success: true,
+      message: '新しい単語カードが正常に作成されました',
+      data: this.mapVocabularyCard(newCard),
+    };
+  }
+
+  /**
+   * [ADMIN] Get vocabulary card by ID
+   */
+  async getVocabularyById(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('無効な ID です');
+    }
+
+    const card = await VocabularyCard.findById(id)
+      .populate({
+        path: 'learning_unit_id',
+        select: 'title_vi title_ja situation_id level_id',
+        populate: [
+          {
+            path: 'situation_id',
+            select: 'title_vi title_ja place_id',
+            populate: {
+              path: 'place_id',
+              select: 'name_vi name_ja',
+            },
+          },
+          {
+            path: 'level_id',
+            select: 'code name_vi name_ja description',
+          },
+        ],
+      });
+
+    if (!card) {
+      throw new NotFoundException('単語カードが見つかりません');
+    }
+
+    return {
+      success: true,
+      data: this.mapVocabularyCard(card),
+    };
+  }
+
+  /**
+   * [ADMIN] Update vocabulary card
+   */
+  async updateVocabulary(id: string, updateDto: UpdateVocabularyDto) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('無効な ID です');
+    }
+
+    // If learning_unit_id is being changed, validate it exists
+    if (updateDto.learning_unit_id) {
+      const learningUnit = await LearningUnit.findById(updateDto.learning_unit_id);
+      if (!learningUnit) {
+        throw new NotFoundException('Learning unit not found');
+      }
+    }
+
+    const updatedCard = await VocabularyCard.findByIdAndUpdate(
+      id,
+      {
+        ...(updateDto.learning_unit_id && { learning_unit_id: updateDto.learning_unit_id }),
+        ...(updateDto.word_vi && { word_vi: updateDto.word_vi.trim() }),
+        ...(updateDto.meaning_ja && { meaning_ja: updateDto.meaning_ja.trim() }),
+        ...(updateDto.example_vi !== undefined && { example_vi: updateDto.example_vi?.trim() || null }),
+        ...(updateDto.example_ja !== undefined && { example_ja: updateDto.example_ja?.trim() || null }),
+        ...(updateDto.note !== undefined && { note: updateDto.note?.trim() || null }),
+        ...(updateDto.tag !== undefined && { tag: updateDto.tag?.trim() || null }),
+      },
+      { new: true }
+    ).populate({
+      path: 'learning_unit_id',
+      select: 'title_vi title_ja situation_id level_id',
+      populate: [
+        {
+          path: 'situation_id',
+          select: 'title_vi title_ja place_id',
+          populate: {
+            path: 'place_id',
+            select: 'name_vi name_ja',
+          },
+        },
+        {
+          path: 'level_id',
+          select: 'code name_vi name_ja description',
+        },
+      ],
+    });
+
+    if (!updatedCard) {
+      throw new NotFoundException('単語カードが見つかりません');
+    }
+
+    return {
+      success: true,
+      message: '単語カードが正常に更新されました',
+      data: this.mapVocabularyCard(updatedCard),
+    };
+  }
+
+  /**
+   * [ADMIN] Delete vocabulary card
+   */
+  async deleteVocabulary(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('無効な ID です');
+    }
+
+    const card = await VocabularyCard.findByIdAndDelete(id);
+
+    if (!card) {
+      throw new NotFoundException('単語カードが見つかりません');
+    }
+
+    return {
+      success: true,
+      message: '単語カードが正常に削除されました',
+      deletedId: id,
+    };
+  }
+
+  /**
+   * [ADMIN] Get all vocabulary cards with full details (no pagination)
+   */
+  async getAllVocabulary() {
+    const cards = await VocabularyCard.find()
+      .populate({
+        path: 'learning_unit_id',
+        select: 'title_vi title_ja situation_id level_id',
+        populate: [
+          {
+            path: 'situation_id',
+            select: 'title_vi title_ja place_id',
+            populate: {
+              path: 'place_id',
+              select: 'name_vi name_ja',
+            },
+          },
+          {
+            path: 'level_id',
+            select: 'code name_vi name_ja description',
+          },
+        ],
+      })
+      .sort({ created_at: -1 });
+
+    return {
+      success: true,
+      data: cards.map((card) => this.mapVocabularyCard(card)),
+      meta: {
+        total: cards.length,
       },
     };
   }
