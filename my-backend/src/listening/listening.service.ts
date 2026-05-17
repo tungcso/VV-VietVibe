@@ -3,7 +3,7 @@ import * as path from 'path';
 import { CreateListeningDto } from './dto/create-listening.dto';
 import { UpdateListeningDto } from './dto/update-listening.dto';
 
-const models = require(path.resolve(__dirname, '../models'));
+const models = require(path.resolve(__dirname, '../../src/models'));
 const mongoose = require('mongoose');
 const { Types } = mongoose;
 
@@ -21,7 +21,9 @@ export class ListeningService {
       throw new NotFoundException('Không tìm thấy bài nghe.');
     }
 
-    const transcriptLines = await TranscriptLine.find({ lesson_id: lesson._id }).sort({ start_time: 1 });
+    const transcriptLines = await TranscriptLine.find({
+      lesson_id: lesson._id,
+    }).sort({ start_time: 1 });
 
     return {
       ...lesson.toObject(),
@@ -30,12 +32,18 @@ export class ListeningService {
   }
 
   async getListeningLessonByLearningUnit(learningUnitId: string) {
-    const lesson = await ListeningLesson.findOne({ learning_unit_id: this.toObjectId(learningUnitId) });
+    const lesson = await ListeningLesson.findOne({
+      learning_unit_id: this.toObjectId(learningUnitId),
+    });
     if (!lesson) {
-      throw new NotFoundException('Không tìm thấy bài nghe cho learningUnitId này.');
+      throw new NotFoundException(
+        'Không tìm thấy bài nghe cho learningUnitId này.',
+      );
     }
 
-    const transcriptLines = await TranscriptLine.find({ lesson_id: lesson._id }).sort({ start_time: 1 });
+    const transcriptLines = await TranscriptLine.find({
+      lesson_id: lesson._id,
+    }).sort({ start_time: 1 });
 
     return {
       ...lesson.toObject(),
@@ -94,7 +102,9 @@ export class ListeningService {
       throw new NotFoundException('Không tìm thấy bài nghe để cập nhật.');
     }
 
-    await ListeningLesson.findByIdAndUpdate(lessonId, updatePayload, { new: true });
+    await ListeningLesson.findByIdAndUpdate(lessonId, updatePayload, {
+      new: true,
+    });
 
     if (updateDto.transcriptLines) {
       await TranscriptLine.deleteMany({ lesson_id: lessonId });
