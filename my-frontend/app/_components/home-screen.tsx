@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 
 type Task = {
   id: string;
@@ -27,43 +28,14 @@ type Section = {
   tasks: Task[];
 };
 
-type Place = {
-  id: string;
-  nameVi: string;
-  nameJa: string;
-  description?: string | null;
-};
+type TaskProgress = Record<
+  string,
+  Record<string, { vocab?: boolean; listen?: boolean }>
+>;
 
-type Situation = {
-  id: string;
-  placeId: string;
-  titleVi: string;
-  titleJa: string;
-  description?: string | null;
-};
+const PROGRESS_STORAGE_KEY = "vv-task-progress";
+const LAST_SELECTION_STORAGE_KEY = "vv-last-selection";
 
-type LearningUnit = {
-  id: string;
-  situationId: string;
-  levelId: string;
-  titleVi: string;
-  titleJa: string;
-  description?: string | null;
-};
-
-// Map places to icon names
-const placeIconMap: Record<string, IconName> = {
-  super: "cart",
-  supermarket: "cart",
-  restaurant: "restaurant",
-  hospital: "hospital",
-  bus: "bus",
-  salon: "salon",
-  bank: "bank",
-  taxi: "taxi",
-};
-
-// Fallback to hardcoded sections if API fails
 const initialSections: Section[] = [
   {
     id: "super",
@@ -176,14 +148,18 @@ const initialSections: Section[] = [
 ];
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [sections, setSections] = useState<Section[]>(initialSections);
-  const [openId, setOpenId] = useState<string>(initialSections[0]?.id ?? "");
+  const [openIds, setOpenIds] = useState<string[]>(
+    initialSections[0]?.id ? [initialSections[0].id] : [],
+  );
   const [query, setQuery] = useState<string>("");
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMode, setNotificationMode] = useState<
     "login" | "register"
   >("login");
-  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement | null>(null);
 
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
@@ -268,18 +244,90 @@ export default function HomeScreen() {
 
   // Handle login/register notification
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const hasSuccess = localStorage.getItem("showLoginSuccess");
     const mode =
       (localStorage.getItem("loginSuccessMode") as "login" | "register") ||
       "login";
 
-    if (hasSuccess) {
+    if (!hasSuccess) return;
+
+    const timer = window.setTimeout(() => {
       setShowNotification(true);
       setNotificationMode(mode);
-      localStorage.removeItem("showLoginSuccess");
-      localStorage.removeItem("loginSuccessMode");
-    }
+    }, 0);
+
+    localStorage.removeItem("showLoginSuccess");
+    localStorage.removeItem("loginSuccessMode");
+
+    return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const readProgress = () => {
+      try {
+        const stored = localStorage.getItem(PROGRESS_STORAGE_KEY);
+        return stored ? (JSON.parse(stored) as TaskProgress) : {};
+      } catch {
+        return {};
+      }
+    };
+
+    const applyProgress = (progress: TaskProgress) => {
+      setSections((prev) =>
+        prev.map((section) => {
+          const sectionProgress = progress[section.id] ?? {};
+          return {
+            ...section,
+            tasks: section.tasks.map((task) => {
+              const taskProgress = sectionProgress[task.id] ?? {};
+              return {
+                ...task,
+                vocab: taskProgress.vocab ?? task.vocab,
+                listen: taskProgress.listen ?? task.listen,
+              };
+            }),
+          };
+        }),
+      );
+    };
+
+    const syncProgress = () => {
+      const progress = readProgress();
+      applyProgress(progress);
+    };
+
+    syncProgress();
+
+    const handleVisibility = () => {
+      if (!document.hidden) syncProgress();
+    };
+
+    window.addEventListener("focus", syncProgress);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("focus", syncProgress);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isProfileOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!profileRef.current) return;
+      if (!profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isProfileOpen]);
 
   const { total, done } = useMemo(() => {
     let totalCount = 0;
@@ -298,30 +346,79 @@ export default function HomeScreen() {
 
   const progress = total === 0 ? 0 : Math.round((done / total) * 100);
 
+  const normalizedQuery = query.trim().toLowerCase();
+
   const filteredSections = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return sections;
+    if (!normalizedQuery) return sections;
 
     return sections
       .map((section) => {
-        const matchesSection = section.label.toLowerCase().includes(normalized);
+        const matchesSection = section.label
+          .toLowerCase()
+          .includes(normalizedQuery);
         const tasks = section.tasks.filter((task) =>
-          task.title.toLowerCase().includes(normalized),
+          task.title.toLowerCase().includes(normalizedQuery),
         );
         return matchesSection ? section : { ...section, tasks };
       })
       .filter(
         (section) =>
-          section.label.toLowerCase().includes(normalized) ||
+          section.label.toLowerCase().includes(normalizedQuery) ||
           section.tasks.length > 0,
       );
-  }, [query, sections]);
+  }, [normalizedQuery, sections]);
+
+  const handleTaskLaunch = (
+    sectionId: string,
+    taskId: string,
+    field: ToggleField,
+  ) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(
+        LAST_SELECTION_STORAGE_KEY,
+        JSON.stringify({ sectionId, taskId, mode: field }),
+      );
+    }
+
+    router.push(field === "vocab" ? "/vocab" : "/listening");
+  };
+
+  const highlightText = (text: string) => {
+    if (!normalizedQuery) return text;
+
+    const lower = text.toLowerCase();
+    const queryText = normalizedQuery;
+    const parts: Array<string | ReactNode> = [];
+    let startIndex = 0;
+
+    while (startIndex < text.length) {
+      const matchIndex = lower.indexOf(queryText, startIndex);
+      if (matchIndex === -1) {
+        parts.push(text.slice(startIndex));
+        break;
+      }
+
+      if (matchIndex > startIndex) {
+        parts.push(text.slice(startIndex, matchIndex));
+      }
+
+      parts.push(
+        <mark key={`${text}-${matchIndex}`} className="vv-highlight">
+          {text.slice(matchIndex, matchIndex + queryText.length)}
+        </mark>,
+      );
+
+      startIndex = matchIndex + queryText.length;
+    }
+
+    return parts;
+  };
 
   return (
     <div className="min-h-screen w-full bg-linear-to-b from-[#f8f6f2] via-[#f3f7f3] to-[#ecf2ee]">
       {showNotification && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm rounded-2xl bg-white shadow-lg p-4 flex items-center gap-3 mx-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white flex-shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white shrink-0">
             ✓
           </div>
           <div className="flex-1 min-w-0">
@@ -334,7 +431,7 @@ export default function HomeScreen() {
           </div>
           <button
             onClick={() => setShowNotification(false)}
-            className="text-gray-400 hover:text-gray-600 flex-shrink-0 text-lg leading-none"
+            className="text-gray-400 hover:text-gray-600 shrink-0 text-lg leading-none"
           >
             ×
           </button>
@@ -342,9 +439,9 @@ export default function HomeScreen() {
       )}
 
       <div className="mx-auto flex w-full max-w-105 flex-col gap-6 px-4 pb-10 pt-8">
-        <header className="flex items-center justify-between vv-rise-in">
+        <header className="relative z-20 flex items-center justify-between vv-rise-in">
           <div className="flex items-center gap-3">
-            <div className="vv-display flex h-12 w-12 items-center justify-center rounded-2xl bg-(--vv-accent) text-lg text-white shadow-[0_12px_20px_rgba(35,70,60,0.25)]">
+            <div className="vv-logo flex h-12 w-12 items-center justify-center rounded-2xl bg-(--vv-accent) text-lg text-white shadow-[0_12px_20px_rgba(35,70,60,0.25)]">
               VV
             </div>
             <div>
@@ -352,12 +449,33 @@ export default function HomeScreen() {
               <p className="text-xs text-(--vv-muted)">場所を選んで始める</p>
             </div>
           </div>
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-sm font-semibold text-(--vv-accent-strong) shadow-sm ring-1 ring-(--vv-ring)"
-          >
-            TH
-          </button>
+          <div className="relative" ref={profileRef}>
+            <button
+              type="button"
+              onClick={() => setIsProfileOpen((prev) => !prev)}
+              aria-expanded={isProfileOpen}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-(--vv-accent) text-sm font-semibold text-white shadow-sm ring-1 ring-(--vv-ring)"
+            >
+              TH
+            </button>
+            {isProfileOpen ? (
+              <div className="absolute right-0 z-30 mt-2 w-40 rounded-2xl bg-white p-2 shadow-[0_14px_30px_rgba(0,0,0,0.12)] ring-1 ring-(--vv-ring)">
+                <button
+                  type="button"
+                  className="w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-(--vv-muted) transition hover:bg-(--vv-border)"
+                >
+                  プロフィール
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push("/login")}
+                  className="mt-1 w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                >
+                  ログアウト
+                </button>
+              </div>
+            ) : null}
+          </div>
         </header>
 
         <div className="relative vv-rise-in vv-delay-1">
@@ -385,32 +503,6 @@ export default function HomeScreen() {
               style={{ width: `${progress}%` }}
             />
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link
-              href="/vocab"
-              className="rounded-full bg-(--vv-accent-soft) px-4 py-2 text-xs font-semibold text-(--vv-accent-strong)"
-            >
-              今日の語彙カード
-            </Link>
-            <Link
-              href="/login"
-              className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-(--vv-muted) ring-1 ring-(--vv-border)"
-            >
-              ログインする
-            </Link>
-          </div>
-        </section>
-
-        <section className="rounded-3xl bg-white/90 p-4 shadow-[0_18px_32px_rgba(31,43,39,0.08)] ring-1 ring-(--vv-ring) vv-rise-in vv-delay-3">
-          <div className="flex items-center justify-between pb-2">
-            <p className="text-sm font-semibold text-(--vv-muted)">
-              シーンを選択
-            </p>
-            <span className="text-xs text-(--vv-muted)">
-              {filteredSections.length} 件
-            </span>
-          </div>
-
           <div className="mt-2 flex flex-col gap-3">
             {filteredSections.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-(--vv-border) p-4 text-center text-xs text-(--vv-muted)">
@@ -419,7 +511,7 @@ export default function HomeScreen() {
             ) : (
               filteredSections.map((section) => {
                 const isOpen =
-                  openId === section.id ||
+                  openIds.includes(section.id) ||
                   (query.trim().length > 0 && section.tasks.length > 0);
 
                 return (
@@ -430,19 +522,21 @@ export default function HomeScreen() {
                     <button
                       type="button"
                       onClick={() =>
-                        setOpenId((prev) =>
-                          prev === section.id ? "" : section.id,
+                        setOpenIds((prev) =>
+                          prev.includes(section.id)
+                            ? prev.filter((id) => id !== section.id)
+                            : [...prev, section.id],
                         )
                       }
                       className="flex w-full items-center justify-between gap-3 px-4 py-3"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-(--vv-accent-soft) text-(--vv-accent-strong)">
+                        <span className="flex h-9 w-9 items-center justify-center text-(--vv-accent-strong)">
                           <Icon name={section.icon} className="h-5 w-5" />
                         </span>
                         <div className="text-left">
                           <p className="text-sm font-semibold">
-                            {section.label}
+                            {highlightText(section.label)}
                           </p>
                           <p className="text-xs text-(--vv-muted)">
                             {section.tasks.length > 0
@@ -472,29 +566,31 @@ export default function HomeScreen() {
                                 className="flex items-center justify-between gap-3"
                               >
                                 <p className="text-sm font-medium text-foreground">
-                                  {task.title}
+                                  {highlightText(task.title)}
                                 </p>
                                 <div className="flex items-center gap-2">
-                                  <Link
-                                    href={`/vocab?learningUnitId=${task.learningUnitId}`}
-                                    className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-                                      task.vocab
-                                        ? "bg-(--vv-accent-soft) text-(--vv-accent-strong)"
-                                        : "bg-white text-(--vv-muted) ring-1 ring-(--vv-border)"
-                                    }`}
-                                  >
-                                    語彙
-                                  </Link>
-                                  <Link
-                                    href={`/listening?learningUnitId=${task.learningUnitId}`}
-                                    className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-                                      task.listen
-                                        ? "bg-(--vv-accent-soft) text-(--vv-accent-strong)"
-                                        : "bg-white text-(--vv-muted) ring-1 ring-(--vv-border)"
-                                    }`}
-                                  >
-                                    聞く
-                                  </Link>
+                                  <ToggleButton
+                                    label="語彙"
+                                    active={task.vocab}
+                                    onClick={() =>
+                                      handleTaskLaunch(
+                                        section.id,
+                                        task.id,
+                                        "vocab",
+                                      )
+                                    }
+                                  />
+                                  <ToggleButton
+                                    label="聞く"
+                                    active={task.listen}
+                                    onClick={() =>
+                                      handleTaskLaunch(
+                                        section.id,
+                                        task.id,
+                                        "listen",
+                                      )
+                                    }
+                                  />
                                 </div>
                               </div>
                             ))}
@@ -510,6 +606,32 @@ export default function HomeScreen() {
         </section>
       </div>
     </div>
+  );
+}
+
+function ToggleButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+        active
+          ? "bg-(--vv-accent-soft) text-(--vv-accent-strong)"
+          : "bg-white text-(--vv-muted) ring-1 ring-(--vv-border)"
+      }`}
+    >
+      {label}
+      {active ? <span aria-hidden="true">✓</span> : null}
+    </button>
   );
 }
 
@@ -562,10 +684,9 @@ function Icon({ name, className }: { name: IconName; className?: string }) {
           strokeLinejoin="round"
           aria-hidden="true"
         >
-          <path d="M6 6h15l-1.5 8.5a2 2 0 0 1-2 1.5H9.5" />
-          <path d="M6 6l-2-2" />
-          <circle cx="9" cy="20" r="1.5" />
-          <circle cx="18" cy="20" r="1.5" />
+          <circle cx="8" cy="21" r="1" />
+          <circle cx="19" cy="21" r="1" />
+          <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
         </svg>
       );
     case "restaurant":
@@ -580,11 +701,9 @@ function Icon({ name, className }: { name: IconName; className?: string }) {
           strokeLinejoin="round"
           aria-hidden="true"
         >
-          <path d="M8 3v9" />
-          <path d="M12 3v9" />
-          <path d="M6 6h8" />
-          <path d="M18 3v18" />
-          <path d="M16 7h4" />
+          <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
+          <path d="M7 2v20" />
+          <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
         </svg>
       );
     case "hospital":
@@ -599,10 +718,12 @@ function Icon({ name, className }: { name: IconName; className?: string }) {
           strokeLinejoin="round"
           aria-hidden="true"
         >
-          <path d="M4 21V7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14" />
-          <path d="M9 21v-6h6v6" />
-          <path d="M12 9v4" />
-          <path d="M10 11h4" />
+          <path d="M3 21h18" />
+          <path d="M7 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16" />
+          <path d="M3 21v-9a2 2 0 0 1 2-2h2" />
+          <path d="M17 10h2a2 2 0 0 1 2 2v9" />
+          <path d="M12 7v4" />
+          <path d="M10 9h4" />
         </svg>
       );
     case "bus":
@@ -617,11 +738,13 @@ function Icon({ name, className }: { name: IconName; className?: string }) {
           strokeLinejoin="round"
           aria-hidden="true"
         >
-          <path d="M5 16V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10" />
-          <path d="M5 16h14" />
-          <path d="M7 16v3" />
-          <path d="M17 16v3" />
-          <path d="M7 8h10" />
+          <path d="M5 17H4v-9c0-1.1.9-2 2-2h12c1.6 0 3 1.2 3.4 2.7l.6 2.3v4c0 1.1-.9 2-2 2h-1" />
+          <circle cx="17" cy="17" r="2" />
+          <path d="M9 17h6" />
+          <circle cx="7" cy="17" r="2" />
+          <path d="M4 11h18" />
+          <path d="M10 6v5" />
+          <path d="M15 6v5" />
         </svg>
       );
     case "salon":
@@ -636,11 +759,11 @@ function Icon({ name, className }: { name: IconName; className?: string }) {
           strokeLinejoin="round"
           aria-hidden="true"
         >
-          <circle cx="6" cy="6" r="2" />
-          <circle cx="18" cy="6" r="2" />
-          <path d="M8 8l8 8" />
-          <path d="M4 20l6-6" />
-          <path d="M20 20l-6-6" />
+          <circle cx="6" cy="6" r="3" />
+          <circle cx="6" cy="18" r="3" />
+          <line x1="20" y1="4" x2="8.12" y2="15.88" />
+          <line x1="14.47" y1="14.48" x2="20" y2="20" />
+          <line x1="8.12" y1="8.12" x2="12" y2="12" />
         </svg>
       );
     case "bank":
@@ -655,13 +778,12 @@ function Icon({ name, className }: { name: IconName; className?: string }) {
           strokeLinejoin="round"
           aria-hidden="true"
         >
-          <path d="M3 10h18" />
-          <path d="M5 10v8" />
-          <path d="M9 10v8" />
-          <path d="M15 10v8" />
-          <path d="M19 10v8" />
-          <path d="M4 18h16" />
-          <path d="M12 3l9 7H3z" />
+          <path d="M4 9h16l-8-6-8 6Z" />
+          <path d="M6 12v6" />
+          <path d="M10 12v6" />
+          <path d="M14 12v6" />
+          <path d="M18 12v6" />
+          <path d="M3 21h18" />
         </svg>
       );
     case "taxi":
@@ -676,11 +798,10 @@ function Icon({ name, className }: { name: IconName; className?: string }) {
           strokeLinejoin="round"
           aria-hidden="true"
         >
-          <path d="M5 16l1-5h12l1 5" />
-          <path d="M4 16h16" />
-          <path d="M6 11l2-4h8l2 4" />
-          <circle cx="7.5" cy="18" r="1.5" />
-          <circle cx="16.5" cy="18" r="1.5" />
+          <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+          <circle cx="7" cy="17" r="2" />
+          <path d="M9 17h6" />
+          <circle cx="17" cy="17" r="2" />
         </svg>
       );
     default:
