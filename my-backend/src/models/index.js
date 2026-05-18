@@ -5,6 +5,7 @@ const Situation = require('./situation.model');
 const LearningUnit = require('./learningUnit.model');
 const VocabularyCard = require('./vocabularyCard.model');
 const ListeningLesson = require('./listeningLesson.model');
+const ListeningSession = require('./listeningSession.model');
 const TranscriptLine = require('./transcriptLine.model');
 const UserProgress = require('./userProgress.model');
 
@@ -16,6 +17,7 @@ module.exports = {
   LearningUnit,
   VocabularyCard,
   ListeningLesson,
+  ListeningSession,
   TranscriptLine,
   UserProgress,
 };
