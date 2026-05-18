@@ -2,11 +2,13 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe, BadRequestException } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 const mongoose = require('mongoose');
+import { join } from 'path';
 import { MONGO_URI, PORT } from './config/env';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   if (mongoose.connection.readyState === 0) {
     await mongoose.connect(MONGO_URI);
   }
@@ -24,8 +26,14 @@ async function bootstrap() {
               .map((msg: string) => {
                 // Translate common validation messages to Japanese
                 return msg
-                  .replace(/must be longer than or equal to (\d+) characters/i, '最小$1文字以上である必要があります')
-                  .replace(/must be an email/i, '有効なメールアドレスである必要があります')
+                  .replace(
+                    /must be longer than or equal to (\d+) characters/i,
+                    '最小$1文字以上である必要があります',
+                  )
+                  .replace(
+                    /must be an email/i,
+                    '有効なメールアドレスである必要があります',
+                  )
                   .replace(/must be a string/i, '文字列である必要があります')
                   .replace(/should not be empty/i, '空にすることはできません');
               })
@@ -36,9 +44,14 @@ async function bootstrap() {
       },
     }),
   );
-  
+
   // Bật CORS để Next.js có thể gọi API
-  app.enableCors(); 
+  app.enableCors();
+
+  // Serve audio files from /public/audios as /audios/*
+  app.useStaticAssets(join(process.cwd(), 'public', 'audios'), {
+    prefix: '/audios',
+  });
 
   // Cấu hình Swagger
   const config = new DocumentBuilder()

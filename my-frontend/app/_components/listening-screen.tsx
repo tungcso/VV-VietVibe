@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 type PlayMode = "study" | "continuous";
@@ -53,6 +53,7 @@ export default function ListeningScreen() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const learningUnitId = searchParams.get("learningUnitId");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   // Persisted settings (applied immediately)
   const [speed, setSpeed] = useState<(typeof speeds)[number]>("1.0x");
   const [playMode, setPlayMode] = useState<PlayMode>("study");
@@ -73,6 +74,8 @@ export default function ListeningScreen() {
   const [lines, setLines] = useState<TranscriptLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -91,6 +94,13 @@ export default function ListeningScreen() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.playbackRate = speed === "0.75x" ? 0.75 : 1;
+  }, [speed]);
 
   useEffect(() => {
     let mounted = true;
@@ -199,6 +209,13 @@ export default function ListeningScreen() {
         setLesson(selectedLesson);
         setLines(selectedLesson?.transcriptLines ?? []);
         setCurrentIndex(0);
+        setCurrentTime(0);
+        setIsPlaying(false);
+
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        }
       } catch (error: any) {
         if (!mounted) return;
         console.error("Failed to load listening lesson:", error);
@@ -268,6 +285,95 @@ export default function ListeningScreen() {
   const lessonDuration = lesson?.durationSeconds ?? 0;
   const isLastLine = lines.length > 0 && currentIndex >= lines.length - 1;
 
+  const resolveAudioUrl = (audioUrl: string) => {
+    if (!audioUrl) return "";
+    if (/^https?:\/\//i.test(audioUrl)) return audioUrl;
+    return audioUrl.startsWith("/")
+      ? `${BACKEND_URL}${audioUrl}`
+      : `${BACKEND_URL}/${audioUrl}`;
+  };
+
+  // Compute resolved audio src once to avoid passing an empty string
+  // into the `src` attribute (browsers warn and may re-request the page).
+  const resolvedAudioSrc = resolveAudioUrl(lesson?.audioUrl ?? "");
+
+  const getLineIndexForTime = (time: number) => {
+    if (lines.length === 0) return -1;
+
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      if (time >= lines[index].startTime) {
+        return index;
+      }
+    }
+
+    return 0;
+  };
+
+  const seekToLine = (index: number, autoPlay = false) => {
+    const targetLine = lines[index];
+    const audio = audioRef.current;
+
+    if (!targetLine) return;
+
+    setCurrentIndex(index);
+
+    if (audio) {
+      audio.currentTime = targetLine.startTime;
+      setCurrentTime(targetLine.startTime);
+
+      if (autoPlay) {
+        void audio
+          .play()
+          .then(() => setIsPlaying(true))
+          .catch((error) => {
+            console.error("Failed to play audio:", error);
+            setIsPlaying(false);
+          });
+      }
+    }
+  };
+
+  const handleTogglePlay = () => {
+    const audio = audioRef.current;
+
+    if (!audio || !lesson?.audioUrl) return;
+
+    if (audio.paused) {
+      void audio
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch((error) => {
+          console.error("Failed to play audio:", error);
+          setIsPlaying(false);
+        });
+      return;
+    }
+
+    audio.pause();
+    setIsPlaying(false);
+  };
+
+  const handleAudioTimeUpdate = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const time = audio.currentTime;
+    setCurrentTime(time);
+
+    const activeLineIndex = getLineIndexForTime(time);
+    if (activeLineIndex !== -1 && activeLineIndex !== currentIndex) {
+      setCurrentIndex(activeLineIndex);
+    }
+  };
+
+  const handleAudioEnded = () => {
+    setIsPlaying(false);
+    if (lines.length > 0) {
+      setCurrentIndex(lines.length - 1);
+      setCurrentTime(lessonDuration);
+    }
+  };
+
   const markListeningCompletionAndExit = () => {
     if (typeof window !== "undefined") {
       try {
@@ -306,14 +412,14 @@ export default function ListeningScreen() {
     router.push("/");
   };
 
-  const goPrev = () => setCurrentIndex((prev) => Math.max(prev - 1, 0));
+  const goPrev = () => seekToLine(Math.max(currentIndex - 1, 0), isPlaying);
   const goNext = () => {
     if (lines.length === 0) return;
     if (isLastLine) {
       markListeningCompletionAndExit();
       return;
     }
-    setCurrentIndex((prev) => Math.min(prev + 1, lines.length - 1));
+    seekToLine(Math.min(currentIndex + 1, lines.length - 1), isPlaying);
   };
 
   const formatSeconds = (totalSeconds: number) => {
@@ -451,6 +557,19 @@ export default function ListeningScreen() {
       ) : null}
 
       <div className="mx-auto flex w-full max-w-105 flex-col gap-5 px-4 pb-10 pt-6">
+        {resolvedAudioSrc ? (
+          <audio
+            ref={audioRef}
+            src={resolvedAudioSrc}
+            preload="metadata"
+            onTimeUpdate={handleAudioTimeUpdate}
+            onEnded={handleAudioEnded}
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+            className="hidden"
+          />
+        ) : null}
+
         <div className="vv-rise-in">
           <p className="text-xs font-semibold text-(--vv-muted)">
             {lesson?.titleVi ?? "スーパー / レジで支払う"}
@@ -569,10 +688,16 @@ export default function ListeningScreen() {
           <div className="flex items-center gap-4">
             <button
               type="button"
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-(--vv-accent-strong) text-white"
+              onClick={handleTogglePlay}
+              disabled={!lesson?.audioUrl}
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-(--vv-accent-strong) text-white transition disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Play"
             >
-              <PlayIcon className="h-5 w-5" />
+              {isPlaying ? (
+                <PauseIcon className="h-5 w-5" />
+              ) : (
+                <PlayIcon className="h-5 w-5" />
+              )}
             </button>
             <div className="flex-1">
               <div className="h-2 w-full rounded-full bg-white/70">
@@ -580,13 +705,10 @@ export default function ListeningScreen() {
                   className="h-full rounded-full bg-(--vv-accent-strong)"
                   style={{
                     width:
-                      lines.length > 0
+                      lines.length > 0 && lessonDuration > 0
                         ? `${Math.max(
                             8,
-                            Math.min(
-                              100,
-                              ((currentIndex + 1) / lines.length) * 100,
-                            ),
+                            Math.min(100, (currentTime / lessonDuration) * 100),
                           )}%`
                         : "8%",
                   }}
@@ -594,7 +716,7 @@ export default function ListeningScreen() {
               </div>
             </div>
             <span className="text-xs font-semibold text-(--vv-accent-strong)">
-              {formatSeconds(currentLine?.endTime ?? 0)} /{" "}
+              {formatSeconds(Math.floor(currentTime))} /{" "}
               {formatSeconds(lessonDuration)}
             </span>
           </div>
@@ -648,7 +770,7 @@ export default function ListeningScreen() {
               <button
                 key={line.id}
                 type="button"
-                onClick={() => setCurrentIndex(index)}
+                onClick={() => seekToLine(index, isPlaying)}
                 className={`flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition ${
                   isActive
                     ? "bg-[#cfeee3]"
@@ -708,6 +830,19 @@ function PlayIcon({ className }: { className?: string }) {
       aria-hidden="true"
     >
       <path d="M8 5.5v13l10-6.5-10-6.5z" />
+    </svg>
+  );
+}
+
+function PauseIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M7 5.5h3v13H7v-13zm7 0h3v13h-3v-13z" />
     </svg>
   );
 }

@@ -117,7 +117,7 @@ async function seedBusinessData() {
     const listeningLesson = await ListeningLesson.create({
       title_vi: 'Hội thoại gọi phở',
       title_ja: 'フォーを注文する会話',
-      audio_url: '/audios/pho_order.mp3',
+      audio_url: '/audios/pho_order.mp4',
       duration_seconds: 45,
       learning_unit_id: learningUnit._id,
     });
@@ -170,7 +170,7 @@ async function seedBusinessData() {
     const listeningLesson2 = await ListeningLesson.create({
       title_vi: 'Hội thoại thanh toán tại nhà hàng',
       title_ja: 'レストランでの支払い会話',
-      audio_url: '/audios/payment_restaurant.mp3',
+      audio_url: '/audios/payment_restaurant.mp4',
       duration_seconds: 60,
       learning_unit_id: learningUnit2._id,
     });
