@@ -1,5 +1,10 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { JWT_SECRET } from '../../config/env.js';
 
 export interface JwtPayload {
@@ -7,6 +12,7 @@ export interface JwtPayload {
   email: string;
   role: string;
   type: 'access' | 'refresh';
+  jti?: string;
   iat?: number;
   exp?: number;
 }
@@ -23,6 +29,7 @@ export class JwtUtilsService {
         email,
         role,
         type: 'access',
+        jti: randomUUID(),
       },
       JWT_SECRET,
       { expiresIn: '1d' },
@@ -39,6 +46,7 @@ export class JwtUtilsService {
         email,
         role,
         type: 'refresh',
+        jti: randomUUID(),
       },
       JWT_SECRET,
       { expiresIn: '30d' },
