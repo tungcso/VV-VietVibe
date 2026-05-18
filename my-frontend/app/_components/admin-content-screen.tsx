@@ -38,7 +38,7 @@ type ScriptDraft = {
   timestamp: string;
 };
 
-const locations: Location[] = [
+const initialLocations: Location[] = [
   {
     id: "super",
     label: "スーパー",
@@ -91,30 +91,6 @@ const locations: Location[] = [
     icon: "salon",
     status: "edited",
     units: [],
-  },
-];
-
-const vocabRows = [
-  {
-    index: "1",
-    term: "chém gió",
-    type: "từ lóng",
-    meaning: "大げさに話す・ほら吹き",
-    example: "“Anh ấy hay chém gió lắm.”",
-  },
-  {
-    index: "2",
-    term: "một mũi tên trúng hai đích",
-    type: "thành ngữ",
-    meaning: "一石二鳥",
-    example: "“Đi học vừa học được kiến thức vừa gặp bạn bè.”",
-  },
-  {
-    index: "3",
-    term: "thanh toán không tiếp xúc",
-    type: "từ chuyên ngành",
-    meaning: "非接触決済",
-    example: "“Bạn có thể thanh toán không tiếp xúc bằng thẻ này.”",
   },
 ];
 
@@ -192,10 +168,65 @@ export default function AdminContentScreen() {
     jp: "",
     timestamp: "0:00",
   });
+  const [isVocabImportOpen, setIsVocabImportOpen] = useState(false);
+  const [vocabRows, setVocabRows] = useState(() => [
+    {
+      index: "1",
+      term: "chém gió",
+      type: "từ lóng",
+      meaning: "大げさに話す・ほら吹き",
+      example: "“Anh ấy hay chém gió lắm.”",
+    },
+    {
+      index: "2",
+      term: "một mũi tên trúng hai đích",
+      type: "thành ngữ",
+      meaning: "一石二鳥",
+      example: "“Đi học vừa học được kiến thức vừa gặp bạn bè.”",
+    },
+    {
+      index: "3",
+      term: "thanh toán không tiếp xúc",
+      type: "từ chuyên ngành",
+      meaning: "非接触決済",
+      example: "“Bạn có thể thanh toán không tiếp xúc bằng thẻ này.”",
+    },
+  ]);
+  const [locationsState, setLocationsState] =
+    useState<Location[]>(initialLocations);
+  const [isAddLocationOpen, setIsAddLocationOpen] = useState(false);
+  const [isEditLocationOpen, setIsEditLocationOpen] = useState(false);
+  const [locationForm, setLocationForm] = useState({
+    id: "",
+    label: "",
+    icon: "",
+  });
+  const [currentLocationId, setCurrentLocationId] = useState<string | null>(
+    null,
+  );
+  const [isAddSituationOpen, setIsAddSituationOpen] = useState(false);
+  const [isEditSituationOpen, setIsEditSituationOpen] = useState(false);
+  const [situationForm, setSituationForm] = useState({ id: "", title: "" });
+  const [deleteLocationIdState, setDeleteLocationIdState] = useState<
+    string | null
+  >(null);
+  const [locationToast, setLocationToast] = useState<string | null>(null);
+  const [vocabModal, setVocabModal] = useState<"add" | "edit" | null>(null);
+  const [vocabForm, setVocabForm] = useState({
+    index: "",
+    term: "",
+    type: "",
+    pronunciation: "",
+    example: "",
+    meaning: "",
+  });
+  const [vocabToEditIndex, setVocabToEditIndex] = useState<string | null>(null);
+  const [deleteVocabIndex, setDeleteVocabIndex] = useState<string | null>(null);
+  const [vocabToast, setVocabToast] = useState<string | null>(null);
 
   const activeLocation = useMemo(() => {
     if (!selectedUnit) return null;
-    return locations.find(
+    return locationsState.find(
       (location) => location.id === selectedUnit.locationId,
     );
   }, [selectedUnit]);
@@ -256,6 +287,14 @@ export default function AdminContentScreen() {
                       </div>
                       <button
                         type="button"
+                        onClick={() => {
+                          setIsAddLocationOpen(true);
+                          setLocationForm({
+                            id: `loc-${Date.now()}`,
+                            label: "",
+                            icon: "",
+                          });
+                        }}
                         className="inline-flex items-center gap-2 rounded-full bg-[#2f5d50] px-4 py-2 text-xs font-semibold text-white"
                       >
                         <PlusIcon className="h-3.5 w-3.5" />
@@ -278,7 +317,7 @@ export default function AdminContentScreen() {
 
                     <div className="mt-6 flex-1 overflow-y-auto pr-2">
                       <div className="space-y-3">
-                        {locations.map((location) => {
+                        {locationsState.map((location) => {
                           const isExpanded = expandedIds.includes(location.id);
                           return (
                             <div key={location.id} className="bg-white">
@@ -308,10 +347,25 @@ export default function AdminContentScreen() {
                                   {location.label}
                                 </button>
                                 <div className="flex items-center gap-2">
-                                  <IconButton ariaLabel="Edit">
+                                  <IconButton
+                                    ariaLabel="Edit"
+                                    onClick={() => {
+                                      setIsEditLocationOpen(true);
+                                      setLocationForm({
+                                        id: location.id,
+                                        label: location.label,
+                                        icon: location.icon,
+                                      });
+                                    }}
+                                  >
                                     <EditIcon className="h-4 w-4" />
                                   </IconButton>
-                                  <IconButton ariaLabel="Delete">
+                                  <IconButton
+                                    ariaLabel="Delete"
+                                    onClick={() =>
+                                      setDeleteLocationIdState(location.id)
+                                    }
+                                  >
                                     <TrashIcon className="h-4 w-4" />
                                   </IconButton>
                                   <StatusDot status={location.status} />
@@ -322,6 +376,14 @@ export default function AdminContentScreen() {
                                 <div className="border-[#eef2ee] px-3 py-2">
                                   <button
                                     type="button"
+                                    onClick={() => {
+                                      setIsAddSituationOpen(true);
+                                      setCurrentLocationId(location.id);
+                                      setSituationForm({
+                                        id: `unit-${Date.now()}`,
+                                        title: "",
+                                      });
+                                    }}
                                     className="flex items-center gap-2 rounded-xl px-2 py-2 text-xs font-semibold text-[#7b8b83]"
                                   >
                                     <PlusIcon className="h-3.5 w-3.5" />
@@ -403,14 +465,30 @@ export default function AdminContentScreen() {
                           <span className="text-[11px] text-[#7b8b83]">
                             ✓ Đã lưu tự động
                           </span>
-                          <span className="rounded-full bg-[#d7f0e5] px-3 py-1 text-[11px] font-semibold text-[#2f5d50]">
-                            Đã xuất bản
-                          </span>
+                          {activeUnit?.status === "published" ? (
+                            <span className="rounded-full bg-[#d7f0e5] px-3 py-1 text-[11px] font-semibold text-[#2f5d50]">
+                              Đã xuất bản
+                            </span>
+                          ) : activeUnit?.status === "edited" ? (
+                            <span className="rounded-full bg-[#f4b24f] px-3 py-1 text-[11px] font-semibold text-white">
+                              Đã sửa đổi
+                            </span>
+                          ) : (
+                            <span className="rounded-full px-3 py-1 text-[11px] font-semibold text-[#b4771e] border border-[#f4b24f] bg-white">
+                              Nháp
+                            </span>
+                          )}
+
                           <button
                             type="button"
-                            className="rounded-full bg-[#2f5d50] px-4 py-1 text-[11px] font-semibold text-white"
+                            className={`rounded-full px-4 py-1 text-[11px] font-semibold flex items-center gap-2 ${
+                              activeUnit?.status === "published"
+                                ? "bg-[#9aa8a2] text-white"
+                                : "bg-[#2f5d50] text-white"
+                            }`}
                           >
-                            Xuất bản
+                            <EyeIcon className="h-4 w-4" />
+                            <span>Xuất bản</span>
                           </button>
                         </div>
                       </div>
@@ -450,12 +528,24 @@ export default function AdminContentScreen() {
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
+                                onClick={() => setIsVocabImportOpen(true)}
                                 className="rounded-full border border-[#dfe6df] px-3 py-1 text-[11px] font-semibold text-[#7b8b83]"
                               >
                                 Import CSV
                               </button>
                               <button
                                 type="button"
+                                onClick={() => {
+                                  setVocabModal("add");
+                                  setVocabForm({
+                                    index: (vocabRows.length + 1).toString(),
+                                    term: "",
+                                    type: "",
+                                    pronunciation: "",
+                                    example: "",
+                                    meaning: "",
+                                  });
+                                }}
                                 className="rounded-full bg-[#2f5d50] px-3 py-1 text-[11px] font-semibold text-white"
                               >
                                 + Thêm thẻ
@@ -498,10 +588,31 @@ export default function AdminContentScreen() {
                                     <td className="px-4 py-3">{row.example}</td>
                                     <td className="px-4 py-3">
                                       <div className="flex items-center gap-2">
-                                        <IconButton ariaLabel="Edit">
+                                        <IconButton
+                                          ariaLabel="Edit"
+                                          onClick={() => {
+                                            setVocabModal("edit");
+                                            setVocabToEditIndex(row.index);
+                                            setVocabForm({
+                                              index: row.index,
+                                              term: row.term,
+                                              type: row.type,
+                                              pronunciation:
+                                                (row as any).pronunciation ||
+                                                "",
+                                              example: row.example,
+                                              meaning: row.meaning,
+                                            });
+                                          }}
+                                        >
                                           <EditIcon className="h-4 w-4" />
                                         </IconButton>
-                                        <IconButton ariaLabel="Delete">
+                                        <IconButton
+                                          ariaLabel="Delete"
+                                          onClick={() =>
+                                            setDeleteVocabIndex(row.index)
+                                          }
+                                        >
                                           <TrashIcon className="h-4 w-4 text-[#d46b6b]" />
                                         </IconButton>
                                       </div>
@@ -1040,6 +1151,592 @@ export default function AdminContentScreen() {
         </div>
       ) : null}
 
+      {isVocabImportOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-6"
+          onClick={() => setIsVocabImportOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-3xl bg-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#f0f2f0] px-6 py-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <UploadIcon className="h-4 w-4 text-[#2f5d50]" />
+                Import CSV từ vựng
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsVocabImportOpen(false)}
+                className="text-[#9aa8a2]"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="px-6 pb-6 pt-5">
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#d7dfd9] bg-[#f7f9f7] px-6 py-10 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef2ee] text-[#7b8b83]">
+                  <FileIcon className="h-5 w-5" />
+                </div>
+                <p className="mt-4 text-xs text-[#7b8b83]">
+                  Kéo thả vào đây hoặc{" "}
+                  <span className="font-semibold text-[#2f5d50]">
+                    chọn file
+                  </span>
+                </p>
+                <p className="mt-2 text-[11px] text-[#9aa8a2]">
+                  Định dạng: từ, loại_từ, nghĩa_nhật, ví_dụ_việt, ví_dụ_nhật,
+                  ghi_chú
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-4 border-t border-[#f0f2f0] px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setIsVocabImportOpen(false)}
+                className="text-sm font-semibold text-[#7b8b83]"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsVocabImportOpen(false)}
+                className="inline-flex items-center gap-2 rounded-full bg-[#b6c4bf] px-4 py-2 text-xs font-semibold text-white"
+              >
+                <UploadIcon className="h-4 w-4" />
+                Import
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {vocabModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-6"
+          onClick={() => setVocabModal(null)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-3xl bg-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#f0f2f0] px-6 py-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <EditIcon className="h-4 w-4 text-[#2f5d50]" />
+                {vocabModal === "add"
+                  ? "Thêm thẻ từ vựng"
+                  : "Chỉnh sửa thẻ từ vựng"}
+              </div>
+              <button
+                type="button"
+                onClick={() => setVocabModal(null)}
+                className="text-[#9aa8a2]"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="px-6 pb-6 pt-5 text-xs text-[#7b8b83]">
+              <p className="text-[11px] font-semibold text-[#2f5d50]">
+                MẶT TRƯỚC
+              </p>
+              <div className="mt-3 space-y-3">
+                <label className="flex flex-col gap-2">
+                  Từ / Cụm từ (tiếng Việt)
+                  <input
+                    value={vocabForm.term}
+                    onChange={(e) =>
+                      setVocabForm((p) => ({ ...p, term: e.target.value }))
+                    }
+                    placeholder="chém gió"
+                    className="h-12 rounded-2xl border border-transparent bg-[#f7f9f7] px-4 text-sm text-[#1f2b27] ring-1 ring-[#eef2ee] focus:outline-none"
+                  />
+                </label>
+
+                <div className="flex gap-4">
+                  <label className="flex-1 flex flex-col gap-2">
+                    Loại từ
+                    <input
+                      value={vocabForm.type}
+                      onChange={(e) =>
+                        setVocabForm((p) => ({ ...p, type: e.target.value }))
+                      }
+                      className="h-12 rounded-2xl border border-transparent bg-[#f7f9f7] px-4 text-sm text-[#1f2b27] ring-1 ring-[#eef2ee] focus:outline-none"
+                    />
+                  </label>
+                  <label className="flex-1 flex flex-col gap-2">
+                    Phát âm (tùy chọn)
+                    <input
+                      value={vocabForm.pronunciation}
+                      onChange={(e) =>
+                        setVocabForm((p) => ({
+                          ...p,
+                          pronunciation: e.target.value,
+                        }))
+                      }
+                      placeholder="VD: chém zó"
+                      className="h-12 rounded-2xl border border-transparent bg-[#f7f9f7] px-4 text-sm text-[#1f2b27] ring-1 ring-[#eef2ee] focus:outline-none"
+                    />
+                  </label>
+                </div>
+
+                <label className="flex flex-col gap-2">
+                  Ví dụ câu (tiếng Việt)
+                  <input
+                    value={vocabForm.example}
+                    onChange={(e) =>
+                      setVocabForm((p) => ({ ...p, example: e.target.value }))
+                    }
+                    placeholder='"Anh ấy hay chém gió lắm."'
+                    className="h-12 rounded-2xl border border-transparent bg-[#f7f9f7] px-4 text-sm text-[#1f2b27] ring-1 ring-[#eef2ee] focus:outline-none"
+                  />
+                </label>
+
+                <p className="text-[11px] font-semibold text-[#2f5d50]">
+                  MẶT SAU
+                </p>
+                <label className="flex flex-col gap-2">
+                  Nghĩa tiếng Nhật
+                  <input
+                    value={vocabForm.meaning}
+                    onChange={(e) =>
+                      setVocabForm((p) => ({ ...p, meaning: e.target.value }))
+                    }
+                    className="h-12 rounded-2xl border border-transparent bg-[#f7f9f7] px-4 text-sm text-[#1f2b27] ring-1 ring-[#eef2ee] focus:outline-none"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-4 border-t border-[#f0f2f0] px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setVocabModal(null)}
+                className="text-sm font-semibold text-[#7b8b83]"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (vocabModal === "add") {
+                    setVocabRows((prev) => [...prev, { ...vocabForm }]);
+                    setVocabModal(null);
+                  } else if (vocabModal === "edit" && vocabToEditIndex) {
+                    setVocabRows((prev) =>
+                      prev.map((r) =>
+                        r.index === vocabToEditIndex ? { ...vocabForm } : r,
+                      ),
+                    );
+                    setVocabModal(null);
+                    setVocabToEditIndex(null);
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-[#2f5d50] px-4 py-2 text-xs font-semibold text-white"
+              >
+                <SaveIcon className="h-4 w-4" />
+                Lưu thẻ
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteVocabIndex ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-6"
+          onClick={() => setDeleteVocabIndex(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-[0_20px_40px_rgba(0,0,0,0.18)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#eef2ee] pb-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#9f3d3a]">
+                <TrashIcon className="h-4 w-4 text-[#9F403D]" />
+                Xóa thẻ từ vựng
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteVocabIndex(null)}
+                className="text-[#9aa8a2]"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-4 text-sm text-[#2D3432]">
+              Bạn có chắc chắn muốn xóa thẻ #{deleteVocabIndex}?
+            </p>
+            <div className="mt-5 border-t border-[#eef2ee] pt-4">
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeleteVocabIndex(null)}
+                  className="text-sm font-semibold text-[#7b8b83]"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const idx = deleteVocabIndex;
+                    setVocabRows((prev) => prev.filter((r) => r.index !== idx));
+                    setDeleteVocabIndex(null);
+                    setVocabToast(`Đã xóa thẻ #${idx}.`);
+                    window.setTimeout(() => setVocabToast(null), 2400);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#9F403D] px-4 py-2 text-xs font-semibold text-white"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {vocabToast ? (
+        <div className="fixed top-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl bg-white px-6 py-4 shadow-[0_16px_32px_rgba(0,0,0,0.12)]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#d8eee2] text-[#2f5d50]">
+            ✓
+          </div>
+          <p className="text-sm text-[#1f2b27]">{vocabToast}</p>
+          <button
+            type="button"
+            onClick={() => setVocabToast(null)}
+            className="text-[#9aa8a2]"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
+
+      {isAddLocationOpen || isEditLocationOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-6"
+          onClick={() => {
+            setIsAddLocationOpen(false);
+            setIsEditLocationOpen(false);
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-3xl bg-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#f0f2f0] px-6 py-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <PlusIcon className="h-4 w-4 text-[#2f5d50]" />
+                {isAddLocationOpen
+                  ? "+ Thêm địa điểm"
+                  : "Chỉnh sửa tên địa điểm và biểu tượng"}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddLocationOpen(false);
+                  setIsEditLocationOpen(false);
+                }}
+                className="text-[#9aa8a2]"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-6 pb-6 pt-5 text-xs text-[#7b8b83]">
+              <label className="flex flex-col gap-2">
+                Tên địa điểm
+                <input
+                  value={locationForm.label}
+                  onChange={(e) =>
+                    setLocationForm((p) => ({ ...p, label: e.target.value }))
+                  }
+                  placeholder="VD: Siêu thị"
+                  className="h-12 rounded-2xl border border-transparent bg-[#f7f9f7] px-4 text-sm text-[#1f2b27] ring-1 ring-[#eef2ee] focus:outline-none"
+                />
+              </label>
+              <label className="flex flex-col gap-2 mt-4">
+                Biểu tượng
+                <input
+                  value={locationForm.icon}
+                  onChange={(e) =>
+                    setLocationForm((p) => ({ ...p, icon: e.target.value }))
+                  }
+                  placeholder="Dán biểu tượng cảm xúc — VD 🏬"
+                  className="h-12 rounded-2xl border border-transparent bg-[#f7f9f7] px-4 text-sm text-[#1f2b27] ring-1 ring-[#eef2ee] focus:outline-none"
+                />
+                <p className="text-[11px] text-[#9aa8a2]">
+                  Tìm kiếm biểu tượng cảm xúc trên emojipedia.org và dán vào đây
+                </p>
+              </label>
+              <div className="mt-6 flex items-center justify-between text-xs text-[#7b8b83]">
+                <div>
+                  <p className="text-[11px] font-semibold">Trạng thái</p>
+                  <p>Nháp</p>
+                </div>
+                <div className="text-[11px] text-[#9aa8a2]">
+                  Tự động thiết lập theo tình huống
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-4 border-t border-[#f0f2f0] px-6 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddLocationOpen(false);
+                  setIsEditLocationOpen(false);
+                }}
+                className="text-sm font-semibold text-[#7b8b83]"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isAddLocationOpen) {
+                    setLocationsState((prev) => [
+                      ...prev,
+                      {
+                        id: locationForm.id || `loc-${Date.now()}`,
+                        label: locationForm.label || "Tên mới",
+                        icon: (locationForm.icon as any) || "cart",
+                        status: "draft",
+                        units: [],
+                      },
+                    ]);
+                    setIsAddLocationOpen(false);
+                    setLocationToast("Đã thêm địa điểm.");
+                  } else {
+                    setLocationsState((prev) =>
+                      prev.map((l) =>
+                        l.id === locationForm.id
+                          ? {
+                              ...l,
+                              label: locationForm.label,
+                              icon: locationForm.icon as IconName,
+                            }
+                          : l,
+                      ),
+                    );
+                    setIsEditLocationOpen(false);
+                    setLocationToast("Đã cập nhật địa điểm.");
+                  }
+                  window.setTimeout(() => setLocationToast(null), 2400);
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-[#2f5d50] px-4 py-2 text-xs font-semibold text-white"
+              >
+                <SaveIcon className="h-4 w-4" />
+                Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isAddSituationOpen || isEditSituationOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-6"
+          onClick={() => {
+            setIsAddSituationOpen(false);
+            setIsEditSituationOpen(false);
+            setCurrentLocationId(null);
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-3xl bg-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#f0f2f0] px-6 py-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <PlusIcon className="h-4 w-4 text-[#2f5d50]" />
+                {isAddSituationOpen
+                  ? "+ Thêm tình huống"
+                  : "Chỉnh sửa tên tình huống"}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddSituationOpen(false);
+                  setIsEditSituationOpen(false);
+                  setCurrentLocationId(null);
+                }}
+                className="text-[#9aa8a2]"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-6 pb-6 pt-5 text-xs text-[#7b8b83]">
+              <label className="flex flex-col gap-2">
+                Tên tình huống
+                <input
+                  value={situationForm.title}
+                  onChange={(e) =>
+                    setSituationForm((p) => ({ ...p, title: e.target.value }))
+                  }
+                  placeholder="VD: レジで支払う"
+                  className="h-12 rounded-2xl border border-transparent bg-[#f7f9f7] px-4 text-sm text-[#1f2b27] ring-1 ring-[#eef2ee] focus:outline-none"
+                />
+              </label>
+              <div className="mt-6 flex items-center justify-between text-xs text-[#7b8b83]">
+                <div>
+                  <p className="text-[11px] font-semibold">Trạng thái</p>
+                  <p>Nháp</p>
+                </div>
+                <div className="text-[11px] text-[#9aa8a2]">
+                  Nhấn "Xuất bản" sau khi thay đổi
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-4 border-t border-[#f0f2f0] px-6 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddSituationOpen(false);
+                  setIsEditSituationOpen(false);
+                  setCurrentLocationId(null);
+                }}
+                className="text-sm font-semibold text-[#7b8b83]"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isAddSituationOpen && currentLocationId) {
+                    setLocationsState((prev) =>
+                      prev.map((l) =>
+                        l.id === currentLocationId
+                          ? {
+                              ...l,
+                              units: [
+                                ...l.units,
+                                {
+                                  id: situationForm.id,
+                                  title: situationForm.title,
+                                  status: "draft",
+                                  vocabCount: 0,
+                                  listeningCount: 0,
+                                  duration: "0:00",
+                                },
+                              ],
+                            }
+                          : l,
+                      ),
+                    );
+                    setIsAddSituationOpen(false);
+                    setLocationToast("Đã thêm tình huống.");
+                  } else if (isEditSituationOpen && currentLocationId) {
+                    setLocationsState((prev) =>
+                      prev.map((l) =>
+                        l.id === currentLocationId
+                          ? {
+                              ...l,
+                              units: l.units.map((u) =>
+                                u.id === situationForm.id
+                                  ? { ...u, title: situationForm.title }
+                                  : u,
+                              ),
+                            }
+                          : l,
+                      ),
+                    );
+                    setIsEditSituationOpen(false);
+                    setLocationToast("Đã cập nhật tình huống.");
+                  }
+                  window.setTimeout(() => setLocationToast(null), 2400);
+                  setCurrentLocationId(null);
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-[#2f5d50] px-4 py-2 text-xs font-semibold text-white"
+              >
+                <SaveIcon className="h-4 w-4" />
+                Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteLocationIdState ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-6"
+          onClick={() => setDeleteLocationIdState(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-[0_20px_40px_rgba(0,0,0,0.18)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#eef2ee] pb-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#9f3d3a]">
+                <TrashIcon className="h-4 w-4 text-[#9F403D]" />
+                Xóa địa điểm
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteLocationIdState(null)}
+                className="text-[#9aa8a2]"
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-4 text-sm text-[#2D3432]">
+              Bạn có chắc chắn muốn xóa{" "}
+              {
+                locationsState.find((l) => l.id === deleteLocationIdState)
+                  ?.label
+              }
+              ?
+            </p>
+            <div className="mt-5 border-t border-[#eef2ee] pt-4">
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeleteLocationIdState(null)}
+                  className="text-sm font-semibold text-[#7b8b83]"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = deleteLocationIdState;
+                    setLocationsState((prev) =>
+                      prev.filter((l) => l.id !== id),
+                    );
+                    setDeleteLocationIdState(null);
+                    setLocationToast("Đã xóa địa điểm.");
+                    window.setTimeout(() => setLocationToast(null), 2400);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#9F403D] px-4 py-2 text-xs font-semibold text-white"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                  Xóa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {locationToast ? (
+        <div className="fixed top-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl bg-white px-6 py-4 shadow-[0_16px_32px_rgba(0,0,0,0.12)]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#d8eee2] text-[#2f5d50]">
+            ✓
+          </div>
+          <p className="text-sm text-[#1f2b27]">{locationToast}</p>
+          <button
+            type="button"
+            onClick={() => setLocationToast(null)}
+            className="text-[#9aa8a2]"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
+
       {deleteRow ? (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 px-6 pt-16"
@@ -1551,6 +2248,43 @@ function CloseIcon({ className }: { className?: string }) {
     >
       <path d="M18 6 6 18" />
       <path d="M6 6l12 12" />
+    </svg>
+  );
+}
+
+function EyeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function SaveIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+      <path d="M17 21v-8H7v8" />
+      <path d="M7 3v5h8" />
     </svg>
   );
 }

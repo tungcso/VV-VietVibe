@@ -57,7 +57,7 @@ export default function AdminSidebar({ active }: AdminSidebarProps) {
             className={itemClass("audio")}
           >
             <MicIcon className="h-4 w-4" />
-            Kho tệp âm
+            Kho tạp âm
           </button>
         </div>
       </div>
