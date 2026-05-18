@@ -1,13 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-type ModalType =
-  | "activities"
-  | "vocab"
-  | "listening"
-  | "users"
-  | null;
+type ModalType = "activities" | "vocab" | "listening" | "users" | null;
 
 const activities = [
   {
@@ -99,7 +95,13 @@ const users = [
 ];
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+
+  const handleLogout = () => {
+    localStorage.removeItem("vietvibe_auth");
+    router.push("/login");
+  };
 
   return (
     <div className="min-h-screen w-full text-[#1f2b27]">
@@ -170,6 +172,7 @@ export default function DashboardScreen() {
               </div>
               <button
                 type="button"
+                onClick={handleLogout}
                 className="text-xs font-semibold text-red-500"
               >
                 Đăng xuất
@@ -338,7 +341,9 @@ export default function DashboardScreen() {
                 >
                   <div>
                     <p className="font-semibold">{item.title}</p>
-                    <p className="text-[11px] text-[#9aa8a2]">{item.subtitle}</p>
+                    <p className="text-[11px] text-[#9aa8a2]">
+                      {item.subtitle}
+                    </p>
                   </div>
                   <div className="text-right text-[11px] text-[#9aa8a2]">
                     <p>{item.time}</p>

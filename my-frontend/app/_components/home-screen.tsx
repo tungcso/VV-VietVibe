@@ -203,6 +203,23 @@ export default function HomeScreen() {
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
+  // Check user role and redirect admin to dashboard
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const authData = localStorage.getItem("vietvibe_auth");
+    if (!authData) return;
+
+    try {
+      const { user } = JSON.parse(authData);
+      if (user?.role === "admin") {
+        router.push("/dashboard");
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+  }, [router]);
+
   // Load data from API
   useEffect(() => {
     const loadData = async () => {
