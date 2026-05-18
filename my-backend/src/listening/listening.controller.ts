@@ -4,8 +4,10 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -18,8 +20,12 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
+import { AudioProcessingQueryDto } from './dto/audio-processing-query.dto';
 import { CreateListeningDto } from './dto/create-listening.dto';
+import { ListeningSessionQueryDto } from './dto/listening-session-query.dto';
+import { StartListeningSessionDto } from './dto/start-listening-session.dto';
 import { UpdateListeningDto } from './dto/update-listening.dto';
+import { UpdateListeningSessionDto } from './dto/update-listening-session.dto';
 import { ListeningService } from './listening.service';
 import { JwtAuthGuard } from '../login/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../login/guards/roles.guard.js';
@@ -51,15 +57,6 @@ export class ListeningController {
     return this.listeningService.getAllListeningLessons();
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get listening lesson by id' })
-  @ApiParam({ name: 'id', description: 'Listening lesson id' })
-  @ApiOkResponse({ description: 'Listening lesson with transcript lines' })
-  @ApiNotFoundResponse({ description: 'Listening lesson not found' })
-  getListeningLessonById(@Param('id') id: string) {
-    return this.listeningService.getListeningLessonById(id);
-  }
-
   @Get('learning-unit/:learningUnitId')
   @ApiOperation({ summary: 'Get listening lesson by learning unit id' })
   @ApiParam({ name: 'learningUnitId', description: 'Learning unit id' })
@@ -71,6 +68,97 @@ export class ListeningController {
     return this.listeningService.getListeningLessonByLearningUnit(
       learningUnitId,
     );
+  }
+
+  @Post('sessions/:sessionId/complete')
+  @ApiOperation({
+    summary: 'Complete a listening session and persist listening progress',
+  })
+  @ApiParam({ name: 'sessionId', description: 'Listening session id' })
+  @ApiOkResponse({ description: 'Completed listening session state' })
+  @ApiNotFoundResponse({ description: 'Listening session not found' })
+  completeListeningSession(@Param('sessionId') sessionId: string) {
+    return this.listeningService.completeListeningSession(sessionId);
+  }
+
+  @Get('sessions/:sessionId')
+  @ApiOperation({
+    summary: 'Get a listening session with audio processing state',
+  })
+  @ApiParam({ name: 'sessionId', description: 'Listening session id' })
+  @ApiOkResponse({ description: 'Listening session state' })
+  @ApiNotFoundResponse({ description: 'Listening session not found' })
+  getListeningSessionById(@Param('sessionId') sessionId: string) {
+    return this.listeningService.getListeningSessionById(sessionId);
+  }
+
+  @Patch('sessions/:sessionId')
+  @ApiOperation({ summary: 'Update listening session position/settings' })
+  @ApiParam({ name: 'sessionId', description: 'Listening session id' })
+  @ApiOkResponse({ description: 'Updated listening session state' })
+  @ApiNotFoundResponse({ description: 'Listening session not found' })
+  updateListeningSession(
+    @Param('sessionId') sessionId: string,
+    @Body() updateDto: UpdateListeningSessionDto,
+  ) {
+    return this.listeningService.updateListeningSession(sessionId, updateDto);
+  }
+
+  @Get(':id/audio-processing')
+  @ApiOperation({
+    summary: 'Build audio processing plan for a listening lesson',
+    description:
+      'Returns transcript segments, current segment, speed/mode, and ambient-mix metadata for the FE audio player.',
+  })
+  @ApiParam({ name: 'id', description: 'Listening lesson id' })
+  @ApiOkResponse({
+    description: 'Audio processing plan with transcript segments',
+  })
+  @ApiNotFoundResponse({ description: 'Listening lesson not found' })
+  getAudioProcessingPlan(
+    @Param('id') id: string,
+    @Query() query: AudioProcessingQueryDto,
+  ) {
+    return this.listeningService.getAudioProcessingPlan(id, query);
+  }
+
+  @Get(':id/sessions/latest')
+  @ApiOperation({
+    summary: 'Get latest listening session for a lesson and learner',
+  })
+  @ApiParam({ name: 'id', description: 'Listening lesson id' })
+  @ApiOkResponse({ description: 'Latest listening session state' })
+  @ApiNotFoundResponse({ description: 'Listening session not found' })
+  getLatestListeningSession(
+    @Param('id') id: string,
+    @Query() query: ListeningSessionQueryDto,
+  ) {
+    return this.listeningService.getLatestListeningSession(id, query.userId);
+  }
+
+  @Post(':id/sessions')
+  @ApiOperation({
+    summary: 'Start a listening session for a lesson',
+    description:
+      'Creates a session, resumes from saved progress when no initial position is passed, and returns audio processing state.',
+  })
+  @ApiParam({ name: 'id', description: 'Listening lesson id' })
+  @ApiCreatedResponse({ description: 'Started listening session state' })
+  @ApiNotFoundResponse({ description: 'Listening lesson or user not found' })
+  startListeningSession(
+    @Param('id') id: string,
+    @Body() startDto: StartListeningSessionDto,
+  ) {
+    return this.listeningService.startListeningSession(id, startDto);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get listening lesson by id' })
+  @ApiParam({ name: 'id', description: 'Listening lesson id' })
+  @ApiOkResponse({ description: 'Listening lesson with transcript lines' })
+  @ApiNotFoundResponse({ description: 'Listening lesson not found' })
+  getListeningLessonById(@Param('id') id: string) {
+    return this.listeningService.getListeningLessonById(id);
   }
 
   @Put(':id')
