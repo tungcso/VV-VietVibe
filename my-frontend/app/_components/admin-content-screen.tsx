@@ -30,6 +30,14 @@ type SelectedUnit = {
   unitId: string;
 } | null;
 
+type ListeningModal = "replace-audio" | "ambient" | "import-csv" | null;
+
+type ScriptDraft = {
+  vi: string;
+  jp: string;
+  timestamp: string;
+};
+
 const locations: Location[] = [
   {
     id: "super",
@@ -137,12 +145,53 @@ const listeningRows = [
   },
 ];
 
+const ambientOptions = [
+  {
+    id: "cafe",
+    title: "Quán cafe",
+    filename: "cafe-noise.mp3",
+    duration: "2:30",
+  },
+  {
+    id: "street",
+    title: "Đường phố",
+    filename: "street.mp3",
+    duration: "3:00",
+  },
+  {
+    id: "market",
+    title: "Chợ / Siêu thị",
+    filename: "market.mp3",
+    duration: "2:00",
+  },
+  {
+    id: "office",
+    title: "Văn phòng",
+    filename: "office.mp3",
+    duration: "2:45",
+  },
+];
+
 export default function AdminContentScreen() {
   const [isSidebarOpen] = useState(true);
   const [isContentSidebarOpen, setIsContentSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<"vocab" | "listening">("vocab");
   const [expandedIds, setExpandedIds] = useState<string[]>(["super"]);
   const [selectedUnit, setSelectedUnit] = useState<SelectedUnit>(null);
+  const [listeningModal, setListeningModal] = useState<ListeningModal>(null);
+  const [editingRow, setEditingRow] = useState<string | null>(null);
+  const [deleteRow, setDeleteRow] = useState<string | null>(null);
+  const [timestampToast, setTimestampToast] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<ScriptDraft>({
+    vi: "",
+    jp: "",
+    timestamp: "",
+  });
+  const [newRow, setNewRow] = useState<ScriptDraft>({
+    vi: "",
+    jp: "",
+    timestamp: "0:00",
+  });
 
   const activeLocation = useMemo(() => {
     if (!selectedUnit) return null;
@@ -155,6 +204,33 @@ export default function AdminContentScreen() {
     if (!selectedUnit || !activeLocation) return null;
     return activeLocation.units.find((unit) => unit.id === selectedUnit.unitId);
   }, [selectedUnit, activeLocation]);
+
+  const startEditRow = (row: (typeof listeningRows)[number]) => {
+    setEditingRow(row.index);
+    setEditDraft({ vi: row.vi, jp: row.jp, timestamp: row.timestamp });
+  };
+
+  const cancelEditRow = () => {
+    setEditingRow(null);
+  };
+
+  const resetNewRow = () => {
+    setNewRow({ vi: "", jp: "", timestamp: "0:00" });
+  };
+
+  const handleCopyTimestamp = async (rowIndex: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch (error) {
+      console.error(error);
+    }
+    setTimestampToast(`Đã lấy thời gian cho #${rowIndex}.`);
+    window.setTimeout(() => setTimestampToast(null), 2200);
+  };
+
+  const handleConfirmDelete = () => {
+    setDeleteRow(null);
+  };
 
   return (
     <div className="min-h-screen w-full text-[#1f2b27]">
@@ -296,9 +372,9 @@ export default function AdminContentScreen() {
               >
                 {activeUnit ? (
                   <div className=" border border-[#eef2ee] bg-white ">
-                    <div className="px-8 py-4 border-b border-[#eef2ee]">
-                      <div className="flex items-start justify-between ">
-                        <div className="flex items-start gap-3">
+                    <div className="border-b border-[#eef2ee] bg-[#f7f8f5] px-8 py-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
                           <button
                             type="button"
                             onClick={() =>
@@ -323,12 +399,12 @@ export default function AdminContentScreen() {
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-full border border-[#dfe6df] px-3 py-1 text-[11px] font-semibold text-[#7b8b83]">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[11px] text-[#7b8b83]">
                             ✓ Đã lưu tự động
                           </span>
-                          <span className="rounded-full border border-[#f4b24f] bg-[#fff6e8] px-3 py-1 text-[11px] font-semibold text-[#c47b1f]">
-                            Nháp
+                          <span className="rounded-full bg-[#d7f0e5] px-3 py-1 text-[11px] font-semibold text-[#2f5d50]">
+                            Đã xuất bản
                           </span>
                           <button
                             type="button"
@@ -461,7 +537,15 @@ export default function AdminContentScreen() {
                               </div>
                               <div className="text-xs text-[#d7f0e5]">
                                 0:13 / 1:08{" "}
-                                <span className="underline">Thay file</span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setListeningModal("replace-audio")
+                                  }
+                                  className="underline"
+                                >
+                                  Thay file
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -487,7 +571,13 @@ export default function AdminContentScreen() {
                                 Đường phố
                                 <span className="text-[#7b8b83]">×</span>
                               </span>
-                              <span className="text-[#9aa8a2]">+ Thêm...</span>
+                              <button
+                                type="button"
+                                onClick={() => setListeningModal("ambient")}
+                                className="text-[#9aa8a2]"
+                              >
+                                + Thêm...
+                              </button>
                             </div>
                           </div>
 
@@ -499,6 +589,9 @@ export default function AdminContentScreen() {
                               <div className="flex items-center gap-2">
                                 <button
                                   type="button"
+                                  onClick={() =>
+                                    setListeningModal("import-csv")
+                                  }
                                   className="rounded-full border border-[#dfe6df] px-3 py-1 text-[11px] font-semibold text-[#7b8b83]"
                                 >
                                   Import CSV
@@ -527,29 +620,186 @@ export default function AdminContentScreen() {
                                   {listeningRows.map((row) => (
                                     <tr
                                       key={row.index}
-                                      className="border-t border-[#eef2ee]"
+                                      className={`border-t border-[#eef2ee] ${
+                                        editingRow === row.index
+                                          ? "bg-[#eaf6ef]"
+                                          : ""
+                                      }`}
                                     >
                                       <td className="px-4 py-3">{row.index}</td>
-                                      <td className="px-4 py-3">{row.vi}</td>
-                                      <td className="px-4 py-3">{row.jp}</td>
-                                      <td className="px-4 py-3">
-                                        <div className="flex items-center gap-2">
-                                          <span>{row.timestamp}</span>
-                                          <ClockIcon className="h-3.5 w-3.5 text-[#7b8b83]" />
-                                        </div>
-                                      </td>
-                                      <td className="px-4 py-3">
-                                        <div className="flex items-center gap-2">
-                                          <IconButton ariaLabel="Edit">
-                                            <EditIcon className="h-4 w-4" />
-                                          </IconButton>
-                                          <IconButton ariaLabel="Delete">
-                                            <TrashIcon className="h-4 w-4 text-[#d46b6b]" />
-                                          </IconButton>
-                                        </div>
-                                      </td>
+                                      {editingRow === row.index ? (
+                                        <>
+                                          <td className="px-4 py-3">
+                                            <input
+                                              value={editDraft.vi}
+                                              onChange={(event) =>
+                                                setEditDraft((prev) => ({
+                                                  ...prev,
+                                                  vi: event.target.value,
+                                                }))
+                                              }
+                                              placeholder="Nhập câu tiếng Việt..."
+                                              className="h-9 w-full rounded-xl border border-(--vv-accent) bg-white px-3 text-[11px] text-[#1f2b27] focus:outline-none"
+                                            />
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <input
+                                              value={editDraft.jp}
+                                              onChange={(event) =>
+                                                setEditDraft((prev) => ({
+                                                  ...prev,
+                                                  jp: event.target.value,
+                                                }))
+                                              }
+                                              placeholder="Nhập câu tiếng Nhật..."
+                                              className="h-9 w-full rounded-xl border border-(--vv-accent) bg-white px-3 text-[11px] text-[#1f2b27] focus:outline-none"
+                                            />
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                              <input
+                                                value={editDraft.timestamp}
+                                                onChange={(event) =>
+                                                  setEditDraft((prev) => ({
+                                                    ...prev,
+                                                    timestamp:
+                                                      event.target.value,
+                                                  }))
+                                                }
+                                                className="h-9 w-16 rounded-xl border border-(--var-accent) bg-white px-2 text-[11px] text-[#1f2b27] focus:outline-none"
+                                              />
+                                              <ClockIcon className="h-3.5 w-3.5 text-[#7b8b83]" />
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                              <IconButton
+                                                ariaLabel="Save"
+                                                onClick={() =>
+                                                  setEditingRow(null)
+                                                }
+                                                className="border-[#a9d7c1] bg-white text-[#2f5d50]"
+                                              >
+                                                <CheckIcon className="h-4 w-4" />
+                                              </IconButton>
+                                              <IconButton
+                                                ariaLabel="Cancel"
+                                                onClick={cancelEditRow}
+                                                className="border-[#f0c3c3] bg-white text-[#c65d5d]"
+                                              >
+                                                <CloseIcon className="h-4 w-4" />
+                                              </IconButton>
+                                            </div>
+                                          </td>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <td className="px-4 py-3">
+                                            {row.vi}
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            {row.jp}
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                handleCopyTimestamp(
+                                                  row.index,
+                                                  row.timestamp,
+                                                )
+                                              }
+                                              className="flex items-center gap-2"
+                                            >
+                                              <span>{row.timestamp}</span>
+                                              <ClockIcon className="h-3.5 w-3.5 text-[#7b8b83]" />
+                                            </button>
+                                          </td>
+                                          <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                              <IconButton
+                                                ariaLabel="Edit"
+                                                onClick={() =>
+                                                  startEditRow(row)
+                                                }
+                                              >
+                                                <EditIcon className="h-4 w-4" />
+                                              </IconButton>
+                                              <IconButton
+                                                ariaLabel="Delete"
+                                                onClick={() =>
+                                                  setDeleteRow(row.index)
+                                                }
+                                              >
+                                                <TrashIcon className="h-4 w-4 text-[#d46b6b]" />
+                                              </IconButton>
+                                            </div>
+                                          </td>
+                                        </>
+                                      )}
                                     </tr>
                                   ))}
+                                  <tr className="border-t border-[#eef2ee] bg-[#eaf6ef]">
+                                    <td className="px-4 py-3">5</td>
+                                    <td className="px-4 py-3">
+                                      <input
+                                        value={newRow.vi}
+                                        onChange={(event) =>
+                                          setNewRow((prev) => ({
+                                            ...prev,
+                                            vi: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="Nhập câu tiếng Việt..."
+                                        className="h-9 w-full rounded-xl border border-(--var-accent) bg-white px-3 text-[11px] text-[#1f2b27] focus:outline-none"
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <input
+                                        value={newRow.jp}
+                                        onChange={(event) =>
+                                          setNewRow((prev) => ({
+                                            ...prev,
+                                            jp: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="Nhập câu tiếng Nhật..."
+                                        className="h-9 w-full rounded-xl border border-(--var-accent) bg-white px-3 text-[11px] text-[#1f2b27] focus:outline-none"
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          value={newRow.timestamp}
+                                          onChange={(event) =>
+                                            setNewRow((prev) => ({
+                                              ...prev,
+                                              timestamp: event.target.value,
+                                            }))
+                                          }
+                                          className="h-9 w-16 rounded-xl border border-(--vv-accent) bg-white px-2 text-[11px] text-[#1f2b27] focus:outline-none"
+                                        />
+                                        <ClockIcon className="h-3.5 w-3.5 text-[#7b8b83]" />
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center gap-2">
+                                        <IconButton
+                                          ariaLabel="Save"
+                                          className="border-[#a9d7c1] bg-white text-[#2f5d50]"
+                                        >
+                                          <CheckIcon className="h-4 w-4" />
+                                        </IconButton>
+                                        <IconButton
+                                          ariaLabel="Cancel"
+                                          className="border-[#f0c3c3] bg-white text-[#c65d5d]"
+                                          onClick={resetNewRow}
+                                        >
+                                          <CloseIcon className="h-4 w-4" />
+                                        </IconButton>
+                                      </div>
+                                    </td>
+                                  </tr>
                                 </tbody>
                               </table>
                             </div>
@@ -578,6 +828,280 @@ export default function AdminContentScreen() {
           </div>
         </main>
       </div>
+
+      {listeningModal === "replace-audio" ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-6"
+          onClick={() => setListeningModal(null)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-3xl bg-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#f0f2f0] px-6 py-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <UploadIcon className="h-4 w-4 text-[#2f5d50]" />
+                Thay file audio
+              </div>
+              <button
+                type="button"
+                onClick={() => setListeningModal(null)}
+                className="text-[#9aa8a2]"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="px-6 pb-6 pt-4 text-xs text-[#7b8b83]">
+              <div className="space-y-3">
+                <p className="text-[11px] font-semibold text-[#9aa8a2]">
+                  FILE HIỆN TẠI
+                </p>
+                <div className="flex items-center justify-between rounded-2xl bg-[#f7f9f7] px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#d7f0e5] text-[#2f5d50]">
+                      <VolumeIcon className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-[#1f2b27]">
+                        thanh-toan-tai-quay.mp3
+                      </p>
+                      <p className="text-[11px] text-[#9aa8a2]">
+                        2.4 MB · 1:08 · Tải lên 12/04/2026
+                      </p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-[#e7f1ed] px-3 py-1 text-[11px] font-semibold text-[#2f5d50]">
+                    Đang dùng
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                <p className="text-[11px] font-semibold text-[#9aa8a2]">
+                  FILE MỚI
+                </p>
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#d7dfd9] bg-[#f7f9f7] px-6 py-7 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef2ee] text-[#7b8b83]">
+                    <UploadIcon className="h-5 w-5" />
+                  </div>
+                  <p className="mt-4 text-xs text-[#7b8b83]">
+                    Kéo thả file vào đây hoặc{" "}
+                    <span className="font-semibold text-[#2f5d50]">
+                      chọn file
+                    </span>
+                  </p>
+                  <p className="mt-2 text-[11px] text-[#9aa8a2]">
+                    MP3, WAV, M4A · Tối đa 50MB
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 flex items-start gap-3 rounded-2xl border border-[#f1d6a7] bg-[#fff8e8] px-4 py-3 text-[11px] text-[#b4771e]">
+                <WarningIcon className="mt-0.5 h-4 w-4" />
+                <p>
+                  Thay file audio sẽ xóa toàn bộ timestamp trong script hiện
+                  tại. Bạn cần gán lại timestamp sau khi thay file mới lên.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-4 border-t border-[#f0f2f0] px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setListeningModal(null)}
+                className="text-sm font-semibold text-[#7b8b83]"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full bg-[#b6c4bf] px-4 py-2 text-xs font-semibold text-white"
+              >
+                <UploadIcon className="h-4 w-4" />
+                Xác nhận thay
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {listeningModal === "ambient" ? (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 px-6 pt-20"
+          onClick={() => setListeningModal(null)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-3xl bg-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-[#f0f2f0] px-6 py-4">
+              <p className="text-sm font-semibold">Âm thanh môi trường</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-[#d7dfd9] bg-white px-3 py-2 text-xs text-[#7b8b83]">
+                <span className="flex items-center gap-2 rounded-full bg-[#d7f0e5] px-3 py-1 text-[#2f5d50]">
+                  Quán cafe <span className="text-[#7b8b83]">×</span>
+                </span>
+                <span className="flex items-center gap-2 rounded-full bg-[#d7f0e5] px-3 py-1 text-[#2f5d50]">
+                  Đường phố <span className="text-[#7b8b83]">×</span>
+                </span>
+                <span className="text-[#9aa8a2]">+ Thêm...</span>
+              </div>
+              <div className="mt-3 flex items-center gap-2 rounded-2xl border border-[#e6ece6] bg-[#f7f9f7] px-4 py-2 text-xs text-[#9aa8a2]">
+                <SearchIcon className="h-4 w-4" />
+                <span>Tìm âm thanh...</span>
+              </div>
+            </div>
+            <div className="px-6 py-4 text-xs">
+              <div className="space-y-3">
+                {ambientOptions.map((item, index) => (
+                  <label
+                    key={item.id}
+                    className="flex items-start gap-3 text-[#1f2b27]"
+                  >
+                    <input
+                      type="checkbox"
+                      defaultChecked={index < 2}
+                      className="peer sr-only"
+                    />
+                    <span className="mt-1 flex h-4 w-4 items-center justify-center rounded-md border border-[#cfe1d8] bg-white text-transparent peer-checked:border-[#2f5d50] peer-checked:bg-[#2f5d50] peer-checked:text-white">
+                      <CheckIcon className="h-3 w-3" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold">{item.title}</p>
+                      <p className="text-[11px] text-[#9aa8a2]">
+                        {item.filename} · {item.duration}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {listeningModal === "import-csv" ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-6"
+          onClick={() => setListeningModal(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-3xl bg-white shadow-[0_20px_40px_rgba(0,0,0,0.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#f0f2f0] px-6 py-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <UploadIcon className="h-4 w-4 text-[#2f5d50]" />
+                Import CSV hội thoại
+              </div>
+              <button
+                type="button"
+                onClick={() => setListeningModal(null)}
+                className="text-[#9aa8a2]"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-6 pb-6 pt-5">
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#d7dfd9] bg-[#f7f9f7] px-6 py-10 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef2ee] text-[#7b8b83]">
+                  <FileIcon className="h-5 w-5" />
+                </div>
+                <p className="mt-4 text-xs text-[#7b8b83]">
+                  Kéo thả vào đây hoặc{" "}
+                  <span className="font-semibold text-[#2f5d50]">
+                    chọn file
+                  </span>
+                </p>
+                <p className="mt-2 text-[11px] text-[#9aa8a2]">
+                  Định dạng: câu_tiếng_việt, câu_tiếng_nhật, timestamp
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-4 border-t border-[#f0f2f0] px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setListeningModal(null)}
+                className="text-sm font-semibold text-[#7b8b83]"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full bg-[#b6c4bf] px-4 py-2 text-xs font-semibold text-white"
+              >
+                <UploadIcon className="h-4 w-4" />
+                Import
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteRow ? (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 px-6 pt-16"
+          onClick={() => setDeleteRow(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-white shadow-[0_18px_32px_rgba(0,0,0,0.16)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#f0f2f0] px-5 py-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#9f3d3a]">
+                <TrashIcon className="h-4 w-4" />
+                Xóa câu thoại
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteRow(null)}
+                className="text-[#9aa8a2]"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-5 py-4 text-sm text-[#7b8b83]">
+              Bạn có chắc chắn muốn xóa câu thoại #{deleteRow}?
+            </div>
+            <div className="flex items-center justify-end gap-4 border-t border-[#f0f2f0] px-5 py-3">
+              <button
+                type="button"
+                onClick={() => setDeleteRow(null)}
+                className="text-sm font-semibold text-[#7b8b83]"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="inline-flex items-center gap-2 rounded-full bg-[#9f3d3a] px-4 py-2 text-xs font-semibold text-white"
+              >
+                <TrashIcon className="h-4 w-4" />
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {timestampToast ? (
+        <div className="fixed top-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-[0_16px_32px_rgba(0,0,0,0.12)]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#d8eee2] text-[#2f5d50]">
+            <CheckIcon className="h-4 w-4" />
+          </div>
+          <p className="text-sm text-[#1f2b27]">{timestampToast}</p>
+          <button
+            type="button"
+            onClick={() => setTimestampToast(null)}
+            className="text-[#9aa8a2]"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -601,28 +1125,33 @@ function LegendDot({ color }: { color: string }) {
 function getTagClass(type: string) {
   switch (type) {
     case "từ lóng":
-      return "rounded-full bg-[#f1d6d3] px-2 py-1 text-[10px] font-semibold text-[#b85f54]";
+      return "rounded-full bg-(--vv-red) px-2 py-1 text-[10px]  text-white";
     case "thành ngữ":
-      return "rounded-full bg-[#d7ece3] px-2 py-1 text-[10px] font-semibold text-[#2f5d50]";
+      return "rounded-full bg-(--vv-accent-strong) px-2 py-1 text-[10px] text-white";
     case "từ chuyên ngành":
-      return "rounded-full bg-[#dff2ea] px-2 py-1 text-[10px] font-semibold text-[#4a7d6c]";
+      return "rounded-full bg-[#dff2ea] px-2 py-1 text-[10px]  text-black ";
     default:
-      return "rounded-full bg-[#eef2ee] px-2 py-1 text-[10px] font-semibold text-[#7b8b83]";
+      return "rounded-full bg-[#eef2ee] px-2 py-1 text-[10px]  ";
   }
 }
 
 function IconButton({
   children,
   ariaLabel,
+  onClick,
+  className,
 }: {
   children: ReactNode;
   ariaLabel: string;
+  onClick?: () => void;
+  className?: string;
 }) {
   return (
     <button
       type="button"
-      className="flex h-7 w-7 items-center justify-center rounded-full border border-[#eef2ee] text-[#9aa8a2]"
+      className={`flex h-7 w-7 items-center justify-center rounded-full border border-[#eef2ee] text-[#9aa8a2] ${className || ""}`}
       aria-label={ariaLabel}
+      onClick={onClick}
     >
       {children}
     </button>
@@ -913,6 +1442,115 @@ function ClockIcon({ className }: { className?: string }) {
     >
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 3" />
+    </svg>
+  );
+}
+
+function UploadIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 16V6" />
+      <path d="M8 10l4-4 4 4" />
+      <path d="M20 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2" />
+    </svg>
+  );
+}
+
+function VolumeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M11 5 6 9H2v6h4l5 4V5z" />
+      <path d="M19 9a5 5 0 0 1 0 6" />
+    </svg>
+  );
+}
+
+function WarningIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
+function FileIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+function CloseIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 6 6 18" />
+      <path d="M6 6l12 12" />
     </svg>
   );
 }

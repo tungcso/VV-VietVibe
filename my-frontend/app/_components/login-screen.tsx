@@ -73,7 +73,8 @@ export default function LoginScreen() {
       saveAuthData(result.access_token, result.user);
       localStorage.setItem("showLoginSuccess", "true");
       localStorage.setItem("loginSuccessMode", mode);
-      router.push("/");
+      const role = String(result?.user?.role || "").toLowerCase();
+      router.push(role === "admin" ? "/dashboard" : "/");
     } catch (error) {
       console.error(error);
       setIsError(true);

@@ -11,6 +11,7 @@
   --vv-ring: rgba(47, 93, 80, 0.2);
   --vv-border: #e2e8e3;
   --vv-search: #f9f9f7;
+  --vv-red: #9f403d;
 }
 
 @theme inline {
