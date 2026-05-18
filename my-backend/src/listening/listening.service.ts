@@ -7,11 +7,58 @@ const models = require(path.resolve(__dirname, '../../src/models'));
 const mongoose = require('mongoose');
 const { Types } = mongoose;
 
-const { ListeningLesson, TranscriptLine } = models;
-const { LearningUnit } = models;
+const {
+  Place,
+  Situation,
+  LearningUnit,
+  ListeningLesson,
+  TranscriptLine,
+  Level,
+} = models;
 
 @Injectable()
 export class ListeningService {
+  async getAllPlaces() {
+    const places = await Place.find().sort({ created_at: 1 });
+    return places.map((place) => this.mapPlace(place));
+  }
+
+  async getSituationsByPlaceId(placeId: string) {
+    const placeObjectId = this.toObjectId(placeId);
+    const place = await Place.findById(placeObjectId);
+    if (!place) {
+      throw new NotFoundException('Không tìm thấy địa điểm.');
+    }
+
+    const situations = await Situation.find({ place_id: placeObjectId }).sort({
+      created_at: 1,
+    });
+
+    return situations.map((situation) => this.mapSituation(situation));
+  }
+
+  async getLearningUnitsBySituationId(situationId: string) {
+    const situationObjectId = this.toObjectId(situationId);
+    const situation = await Situation.findById(situationObjectId);
+    if (!situation) {
+      throw new NotFoundException('Không tìm thấy tình huống.');
+    }
+
+    const learningUnits = await LearningUnit.find({
+      situation_id: situationObjectId,
+    }).sort({ created_at: 1 });
+
+    // Get level information for each learning unit
+    const unitsWithLevel = await Promise.all(
+      learningUnits.map(async (unit) => {
+        const level = await Level.findById(unit.level_id);
+        return this.mapLearningUnit(unit, level);
+      }),
+    );
+
+    return unitsWithLevel;
+  }
+
   async getAllListeningLessons() {
     return ListeningLesson.find().sort({ created_at: 1 });
   }
@@ -153,5 +200,43 @@ export class ListeningService {
     }
 
     return new Types.ObjectId(value);
+  }
+
+  private mapPlace(place: any) {
+    return {
+      id: String(place._id),
+      nameVi: place.name_vi,
+      nameJa: place.name_ja,
+      description: place.description ?? null,
+    };
+  }
+
+  private mapSituation(situation: any) {
+    return {
+      id: String(situation._id),
+      placeId: String(situation.place_id),
+      titleVi: situation.title_vi,
+      titleJa: situation.title_ja,
+      description: situation.description ?? null,
+    };
+  }
+
+  private mapLearningUnit(unit: any, level: any) {
+    return {
+      id: String(unit._id),
+      situationId: String(unit.situation_id),
+      levelId: String(unit.level_id),
+      titleVi: unit.title_vi,
+      titleJa: unit.title_ja,
+      description: unit.description ?? null,
+      level: level
+        ? {
+            id: String(level._id),
+            code: level.code,
+            nameVi: level.name_vi ?? null,
+            nameJa: level.name_ja,
+          }
+        : null,
+    };
   }
 }

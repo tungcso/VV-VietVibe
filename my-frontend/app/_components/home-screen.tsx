@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 
-type ToggleField = "vocab" | "listen";
-
 type Task = {
   id: string;
   title: string;
   vocab: boolean;
   listen: boolean;
+  learningUnitId?: string;
 };
 
 type IconName =
@@ -28,6 +27,43 @@ type Section = {
   tasks: Task[];
 };
 
+type Place = {
+  id: string;
+  nameVi: string;
+  nameJa: string;
+  description?: string | null;
+};
+
+type Situation = {
+  id: string;
+  placeId: string;
+  titleVi: string;
+  titleJa: string;
+  description?: string | null;
+};
+
+type LearningUnit = {
+  id: string;
+  situationId: string;
+  levelId: string;
+  titleVi: string;
+  titleJa: string;
+  description?: string | null;
+};
+
+// Map places to icon names
+const placeIconMap: Record<string, IconName> = {
+  super: "cart",
+  supermarket: "cart",
+  restaurant: "restaurant",
+  hospital: "hospital",
+  bus: "bus",
+  salon: "salon",
+  bank: "bank",
+  taxi: "taxi",
+};
+
+// Fallback to hardcoded sections if API fails
 const initialSections: Section[] = [
   {
     id: "super",
@@ -144,12 +180,99 @@ export default function HomeScreen() {
   const [openId, setOpenId] = useState<string>(initialSections[0]?.id ?? "");
   const [query, setQuery] = useState<string>("");
   const [showNotification, setShowNotification] = useState(false);
-  const [notificationMode, setNotificationMode] = useState<"login" | "register">("login");
+  const [notificationMode, setNotificationMode] = useState<
+    "login" | "register"
+  >("login");
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+
+  // Load data from API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoadingData(true);
+
+        // Fetch places
+        const placesRes = await fetch(`${API_BASE_URL}/listening/places`);
+        if (!placesRes.ok) throw new Error("Failed to fetch places");
+        const places: Place[] = await placesRes.json();
+
+        // For each place, fetch situations and their learning units
+        const sectionsData: Section[] = [];
+
+        for (const place of places) {
+          // Fetch situations for this place
+          const situationsRes = await fetch(
+            `${API_BASE_URL}/listening/places/${place.id}/situations`,
+          );
+          if (!situationsRes.ok) continue;
+          const situations: Situation[] = await situationsRes.json();
+
+          // For each situation, fetch learning units
+          const tasks: Task[] = [];
+          for (const situation of situations) {
+            const learningUnitsRes = await fetch(
+              `${API_BASE_URL}/listening/situations/${situation.id}/learning-units`,
+            );
+            if (!learningUnitsRes.ok) continue;
+            const learningUnits: LearningUnit[] = await learningUnitsRes.json();
+
+            // Convert learning units to tasks
+            for (const unit of learningUnits) {
+              tasks.push({
+                id: unit.id,
+                title: unit.titleJa,
+                vocab: true, // Assume all have vocab for now
+                listen: true, // Assume all have listening for now
+                learningUnitId: unit.id,
+              });
+            }
+          }
+
+          // Get icon for this place
+          const placeKey = place.nameVi.toLowerCase().replace(/\s+/g, "-");
+          const icon: IconName = Object.keys(placeIconMap).some((key) =>
+            placeKey.includes(key),
+          )
+            ? placeIconMap[
+                Object.keys(placeIconMap).find((key) =>
+                  placeKey.includes(key),
+                ) as string
+              ]
+            : "cart";
+
+          sectionsData.push({
+            id: place.id,
+            label: place.nameJa,
+            icon,
+            tasks,
+          });
+        }
+
+        if (sectionsData.length > 0) {
+          setSections(sectionsData);
+          setOpenId(sectionsData[0]?.id ?? "");
+        }
+      } catch (error) {
+        console.error("Failed to load data from API:", error);
+        // Use fallback data
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    loadData();
+  }, [API_BASE_URL]);
+
+  // Handle login/register notification
   useEffect(() => {
     const hasSuccess = localStorage.getItem("showLoginSuccess");
-    const mode = localStorage.getItem("loginSuccessMode") as "login" | "register" || "login";
-    
+    const mode =
+      (localStorage.getItem("loginSuccessMode") as "login" | "register") ||
+      "login";
+
     if (hasSuccess) {
       setShowNotification(true);
       setNotificationMode(mode);
@@ -194,24 +317,6 @@ export default function HomeScreen() {
       );
   }, [query, sections]);
 
-  const toggleTask = (
-    sectionId: string,
-    taskId: string,
-    field: ToggleField,
-  ) => {
-    setSections((prev) =>
-      prev.map((section) => {
-        if (section.id !== sectionId) return section;
-        return {
-          ...section,
-          tasks: section.tasks.map((task) =>
-            task.id === taskId ? { ...task, [field]: !task[field] } : task,
-          ),
-        };
-      }),
-    );
-  };
-
   return (
     <div className="min-h-screen w-full bg-linear-to-b from-[#f8f6f2] via-[#f3f7f3] to-[#ecf2ee]">
       {showNotification && (
@@ -221,7 +326,9 @@ export default function HomeScreen() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm text-green-700">
-              {notificationMode === "login" ? "ログインが完了しました！" : "登録が完了しました！"}
+              {notificationMode === "login"
+                ? "ログインが完了しました！"
+                : "登録が完了しました！"}
             </p>
             <p className="text-xs text-green-600">VietVibeへようこそ</p>
           </div>
@@ -368,20 +475,26 @@ export default function HomeScreen() {
                                   {task.title}
                                 </p>
                                 <div className="flex items-center gap-2">
-                                  <ToggleButton
-                                    label="語彙"
-                                    active={task.vocab}
-                                    onClick={() =>
-                                      toggleTask(section.id, task.id, "vocab")
-                                    }
-                                  />
-                                  <ToggleButton
-                                    label="聞く"
-                                    active={task.listen}
-                                    onClick={() =>
-                                      toggleTask(section.id, task.id, "listen")
-                                    }
-                                  />
+                                  <Link
+                                    href={`/vocab?learningUnitId=${task.learningUnitId}`}
+                                    className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                                      task.vocab
+                                        ? "bg-(--vv-accent-soft) text-(--vv-accent-strong)"
+                                        : "bg-white text-(--vv-muted) ring-1 ring-(--vv-border)"
+                                    }`}
+                                  >
+                                    語彙
+                                  </Link>
+                                  <Link
+                                    href={`/listening?learningUnitId=${task.learningUnitId}`}
+                                    className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                                      task.listen
+                                        ? "bg-(--vv-accent-soft) text-(--vv-accent-strong)"
+                                        : "bg-white text-(--vv-muted) ring-1 ring-(--vv-border)"
+                                    }`}
+                                  >
+                                    聞く
+                                  </Link>
                                 </div>
                               </div>
                             ))}
@@ -397,31 +510,6 @@ export default function HomeScreen() {
         </section>
       </div>
     </div>
-  );
-}
-
-function ToggleButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
-        active
-          ? "bg-(--vv-accent-soft) text-(--vv-accent-strong)"
-          : "bg-white text-(--vv-muted) ring-1 ring-(--vv-border)"
-      }`}
-    >
-      {label}
-    </button>
   );
 }
 
