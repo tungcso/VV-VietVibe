@@ -22,7 +22,7 @@ const DEFAULT_BACKEND =
 const PROGRESS_STORAGE_KEY = "vv-task-progress";
 const LAST_SELECTION_STORAGE_KEY = "vv-last-selection";
 
-async function fetchVocabCards(): Promise<VocabCard[]> {
+async function fetchVocabCards(learningUnitId?: string): Promise<VocabCard[]> {
   try {
     let url = `${DEFAULT_BACKEND}/vocabulary`;
 
@@ -85,6 +85,8 @@ async function fetchVocabCards(): Promise<VocabCard[]> {
 
 export default function VocabScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const learningUnitId = searchParams.get("learningUnitId");
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
 

@@ -12,6 +12,8 @@ type Task = {
   learningUnitId?: string;
 };
 
+type ToggleField = "vocab" | "listen";
+
 type IconName =
   | "cart"
   | "restaurant"
@@ -28,6 +30,30 @@ type Section = {
   tasks: Task[];
 };
 
+type Place = {
+  id: string;
+  nameVi: string;
+  nameJa: string;
+  description?: string | null;
+};
+
+type Situation = {
+  id: string;
+  placeId: string;
+  titleVi: string;
+  titleJa: string;
+  description?: string | null;
+};
+
+type LearningUnit = {
+  id: string;
+  situationId: string;
+  levelId: string;
+  titleVi: string;
+  titleJa: string;
+  description?: string | null;
+};
+
 type TaskProgress = Record<
   string,
   Record<string, { vocab?: boolean; listen?: boolean }>
@@ -35,6 +61,18 @@ type TaskProgress = Record<
 
 const PROGRESS_STORAGE_KEY = "vv-task-progress";
 const LAST_SELECTION_STORAGE_KEY = "vv-last-selection";
+
+// Map places to icon names
+const placeIconMap: Record<string, IconName> = {
+  super: "cart",
+  supermarket: "cart",
+  restaurant: "restaurant",
+  hospital: "hospital",
+  bus: "bus",
+  salon: "salon",
+  bank: "bank",
+  taxi: "taxi",
+};
 
 const initialSections: Section[] = [
   {
@@ -159,6 +197,7 @@ export default function HomeScreen() {
     "login" | "register"
   >("login");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
 
   const API_BASE_URL =
@@ -175,61 +214,63 @@ export default function HomeScreen() {
         if (!placesRes.ok) throw new Error("Failed to fetch places");
         const places: Place[] = await placesRes.json();
 
-        // For each place, fetch situations and their learning units
-        const sectionsData: Section[] = [];
-
-        for (const place of places) {
-          // Fetch situations for this place
-          const situationsRes = await fetch(
-            `${API_BASE_URL}/listening/places/${place.id}/situations`,
-          );
-          if (!situationsRes.ok) continue;
-          const situations: Situation[] = await situationsRes.json();
-
-          // For each situation, fetch learning units
-          const tasks: Task[] = [];
-          for (const situation of situations) {
-            const learningUnitsRes = await fetch(
-              `${API_BASE_URL}/listening/situations/${situation.id}/learning-units`,
+        const sectionsData = await Promise.all(
+          places.map(async (place) => {
+            const situationsRes = await fetch(
+              `${API_BASE_URL}/listening/places/${place.id}/situations`,
             );
-            if (!learningUnitsRes.ok) continue;
-            const learningUnits: LearningUnit[] = await learningUnitsRes.json();
+            if (!situationsRes.ok) return null;
+            const situations: Situation[] = await situationsRes.json();
 
-            // Convert learning units to tasks
-            for (const unit of learningUnits) {
-              tasks.push({
-                id: unit.id,
-                title: unit.titleJa,
-                vocab: true, // Assume all have vocab for now
-                listen: true, // Assume all have listening for now
-                learningUnitId: unit.id,
-              });
-            }
-          }
+            const tasksBySituation = await Promise.all(
+              situations.map(async (situation) => {
+                const learningUnitsRes = await fetch(
+                  `${API_BASE_URL}/listening/situations/${situation.id}/learning-units`,
+                );
+                if (!learningUnitsRes.ok) return [] as Task[];
 
-          // Get icon for this place
-          const placeKey = place.nameVi.toLowerCase().replace(/\s+/g, "-");
-          const icon: IconName = Object.keys(placeIconMap).some((key) =>
-            placeKey.includes(key),
-          )
-            ? placeIconMap[
-                Object.keys(placeIconMap).find((key) =>
-                  placeKey.includes(key),
-                ) as string
-              ]
-            : "cart";
+                const learningUnits: LearningUnit[] =
+                  await learningUnitsRes.json();
 
-          sectionsData.push({
-            id: place.id,
-            label: place.nameJa,
-            icon,
-            tasks,
-          });
-        }
+                return learningUnits.map((unit) => ({
+                  id: unit.id,
+                  title: unit.titleJa,
+                  vocab: true,
+                  listen: true,
+                  learningUnitId: unit.id,
+                }));
+              }),
+            );
 
-        if (sectionsData.length > 0) {
-          setSections(sectionsData);
-          setOpenId(sectionsData[0]?.id ?? "");
+            const tasks = tasksBySituation.flat();
+
+            const placeKey = place.nameVi.toLowerCase().replace(/\s+/g, "-");
+            const icon: IconName = Object.keys(placeIconMap).some((key) =>
+              placeKey.includes(key),
+            )
+              ? placeIconMap[
+                  Object.keys(placeIconMap).find((key) =>
+                    placeKey.includes(key),
+                  ) as string
+                ]
+              : "cart";
+
+            return {
+              id: place.id,
+              label: place.nameJa,
+              icon,
+              tasks,
+            };
+          }),
+        );
+
+        const nextSections = sectionsData.filter(
+          (section): section is Section => section !== null,
+        );
+
+        if (nextSections.length > 0) {
+          setSections(nextSections);
+          setOpenIds([nextSections[0]?.id ?? ""]);
         }
       } catch (error) {
         console.error("Failed to load data from API:", error);
@@ -489,120 +530,146 @@ export default function HomeScreen() {
         </div>
 
         <section className="rounded-3xl bg-white/90 p-4 shadow-[0_18px_32px_rgba(31,43,39,0.08)] ring-1 ring-(--vv-ring) vv-rise-in vv-delay-2">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-(--vv-muted)">
-              全体の進捗
-            </p>
-            <p className="text-sm font-semibold text-(--vv-accent-strong)">
-              {progress}%
-            </p>
-          </div>
-          <div className="mt-3 h-2 w-full rounded-full bg-(--vv-border)">
-            <div
-              className="h-full rounded-full bg-(--vv-accent) transition-[width] duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <div className="mt-2 flex flex-col gap-3">
-            {filteredSections.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-(--vv-border) p-4 text-center text-xs text-(--vv-muted)">
-                該当するシーンが見つかりません。
+          {isLoadingData ? (
+            <div className="animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="h-4 w-24 rounded-full bg-(--vv-border)" />
+                <div className="h-4 w-12 rounded-full bg-(--vv-border)" />
               </div>
-            ) : (
-              filteredSections.map((section) => {
-                const isOpen =
-                  openIds.includes(section.id) ||
-                  (query.trim().length > 0 && section.tasks.length > 0);
-
-                return (
-                  <div
-                    key={section.id}
-                    className="rounded-2xl border border-(--vv-border) bg-white/80"
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpenIds((prev) =>
-                          prev.includes(section.id)
-                            ? prev.filter((id) => id !== section.id)
-                            : [...prev, section.id],
-                        )
-                      }
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center text-(--vv-accent-strong)">
-                          <Icon name={section.icon} className="h-5 w-5" />
-                        </span>
-                        <div className="text-left">
-                          <p className="text-sm font-semibold">
-                            {highlightText(section.label)}
-                          </p>
-                          <p className="text-xs text-(--vv-muted)">
-                            {section.tasks.length > 0
-                              ? `${section.tasks.length} レッスン`
-                              : "準備中"}
-                          </p>
-                        </div>
-                      </div>
-                      <ChevronIcon
-                        className={`h-4 w-4 text-(--vv-muted) transition-transform ${
-                          isOpen ? "rotate-180" : "rotate-0"
-                        }`}
-                      />
-                    </button>
-
-                    {isOpen ? (
-                      <div className="border-t border-(--vv-border) px-4 py-3">
-                        {section.tasks.length === 0 ? (
-                          <p className="text-xs text-(--vv-muted)">
-                            まもなく追加されます。
-                          </p>
-                        ) : (
-                          <div className="flex flex-col gap-3">
-                            {section.tasks.map((task) => (
-                              <div
-                                key={task.id}
-                                className="flex items-center justify-between gap-3"
-                              >
-                                <p className="text-sm font-medium text-foreground">
-                                  {highlightText(task.title)}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                  <ToggleButton
-                                    label="語彙"
-                                    active={task.vocab}
-                                    onClick={() =>
-                                      handleTaskLaunch(
-                                        section.id,
-                                        task.id,
-                                        "vocab",
-                                      )
-                                    }
-                                  />
-                                  <ToggleButton
-                                    label="聞く"
-                                    active={task.listen}
-                                    onClick={() =>
-                                      handleTaskLaunch(
-                                        section.id,
-                                        task.id,
-                                        "listen",
-                                      )
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : null}
+              <div className="mt-3 h-2 w-full rounded-full bg-(--vv-border)" />
+              <div className="mt-4 space-y-3">
+                <div className="rounded-2xl border border-(--vv-border) bg-white/80 p-4">
+                  <div className="h-4 w-32 rounded-full bg-(--vv-border)" />
+                  <div className="mt-3 h-3 w-24 rounded-full bg-(--vv-border)" />
+                </div>
+                <div className="rounded-2xl border border-(--vv-border) bg-white/80 p-4">
+                  <div className="h-4 w-28 rounded-full bg-(--vv-border)" />
+                  <div className="mt-3 h-3 w-20 rounded-full bg-(--vv-border)" />
+                </div>
+                <div className="rounded-2xl border border-(--vv-border) bg-white/80 p-4">
+                  <div className="h-4 w-24 rounded-full bg-(--vv-border)" />
+                  <div className="mt-3 h-3 w-16 rounded-full bg-(--vv-border)" />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-(--vv-muted)">
+                  全体の進捗
+                </p>
+                <p className="text-sm font-semibold text-(--vv-accent-strong)">
+                  {progress}%
+                </p>
+              </div>
+              <div className="mt-3 h-2 w-full rounded-full bg-(--vv-border)">
+                <div
+                  className="h-full rounded-full bg-(--vv-accent) transition-[width] duration-500"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <div className="mt-2 flex flex-col gap-3">
+                {filteredSections.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-(--vv-border) p-4 text-center text-xs text-(--vv-muted)">
+                    該当するシーンが見つかりません。
                   </div>
-                );
-              })
-            )}
-          </div>
+                ) : (
+                  filteredSections.map((section) => {
+                    const isOpen =
+                      openIds.includes(section.id) ||
+                      (query.trim().length > 0 && section.tasks.length > 0);
+
+                    return (
+                      <div
+                        key={section.id}
+                        className="rounded-2xl border border-(--vv-border) bg-white/80"
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenIds((prev) =>
+                              prev.includes(section.id)
+                                ? prev.filter((id) => id !== section.id)
+                                : [...prev, section.id],
+                            )
+                          }
+                          className="flex w-full items-center justify-between gap-3 px-4 py-3"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-9 w-9 items-center justify-center text-(--vv-accent-strong)">
+                              <Icon name={section.icon} className="h-5 w-5" />
+                            </span>
+                            <div className="text-left">
+                              <p className="text-sm font-semibold">
+                                {highlightText(section.label)}
+                              </p>
+                              <p className="text-xs text-(--vv-muted)">
+                                {section.tasks.length > 0
+                                  ? `${section.tasks.length} レッスン`
+                                  : "準備中"}
+                              </p>
+                            </div>
+                          </div>
+                          <ChevronIcon
+                            className={`h-4 w-4 text-(--vv-muted) transition-transform ${
+                              isOpen ? "rotate-180" : "rotate-0"
+                            }`}
+                          />
+                        </button>
+
+                        {isOpen ? (
+                          <div className="border-t border-(--vv-border) px-4 py-3">
+                            {section.tasks.length === 0 ? (
+                              <p className="text-xs text-(--vv-muted)">
+                                まもなく追加されます。
+                              </p>
+                            ) : (
+                              <div className="flex flex-col gap-3">
+                                {section.tasks.map((task) => (
+                                  <div
+                                    key={task.id}
+                                    className="flex items-center justify-between gap-3"
+                                  >
+                                    <p className="text-sm font-medium text-foreground">
+                                      {highlightText(task.title)}
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                      <ToggleButton
+                                        label="語彙"
+                                        active={task.vocab}
+                                        onClick={() =>
+                                          handleTaskLaunch(
+                                            section.id,
+                                            task.id,
+                                            "vocab",
+                                          )
+                                        }
+                                      />
+                                      <ToggleButton
+                                        label="聞く"
+                                        active={task.listen}
+                                        onClick={() =>
+                                          handleTaskLaunch(
+                                            section.id,
+                                            task.id,
+                                            "listen",
+                                          )
+                                        }
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
         </section>
       </div>
     </div>
