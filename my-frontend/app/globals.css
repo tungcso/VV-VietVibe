@@ -5,11 +5,12 @@
   --vv-ink: #1f2b27;
   --vv-muted: #6a7b73;
   --vv-card: #ffffff;
-  --vv-accent: #defff2;
+  --vv-accent: #45655a;
   --vv-accent-strong: #23463c;
   --vv-accent-soft: #c7eadc;
   --vv-ring: rgba(47, 93, 80, 0.2);
   --vv-border: #e2e8e3;
+  --vv-search: #f9f9f7;
 }
 
 @theme inline {

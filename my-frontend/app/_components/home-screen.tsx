@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 
 type ToggleField = "vocab" | "listen";
@@ -33,6 +33,12 @@ type TaskProgress = Record<
   string,
   Record<string, { vocab?: boolean; listen?: boolean }>
 >;
+
+type SearchGroup = {
+  section: Section;
+  sectionMatch: boolean;
+  tasks: Task[];
+};
 
 const PROGRESS_STORAGE_KEY = "vv-task-progress";
 const LAST_SELECTION_STORAGE_KEY = "vv-last-selection";
@@ -159,8 +165,6 @@ export default function HomeScreen() {
   const [notificationMode, setNotificationMode] = useState<
     "login" | "register"
   >("login");
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const profileRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -234,20 +238,6 @@ export default function HomeScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!isProfileOpen) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!profileRef.current) return;
-      if (!profileRef.current.contains(event.target as Node)) {
-        setIsProfileOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isProfileOpen]);
-
   const { total, done } = useMemo(() => {
     let totalCount = 0;
     let doneCount = 0;
@@ -267,24 +257,23 @@ export default function HomeScreen() {
 
   const normalizedQuery = query.trim().toLowerCase();
 
-  const filteredSections = useMemo(() => {
-    if (!normalizedQuery) return sections;
+  const searchGroups = useMemo<SearchGroup[]>(() => {
+    if (!normalizedQuery) return [];
 
-    return sections
-      .map((section) => {
-        const matchesSection = section.label
-          .toLowerCase()
-          .includes(normalizedQuery);
-        const tasks = section.tasks.filter((task) =>
-          task.title.toLowerCase().includes(normalizedQuery),
-        );
-        return matchesSection ? section : { ...section, tasks };
-      })
-      .filter(
-        (section) =>
-          section.label.toLowerCase().includes(normalizedQuery) ||
-          section.tasks.length > 0,
+    return sections.reduce<SearchGroup[]>((acc, section) => {
+      const sectionMatch = section.label
+        .toLowerCase()
+        .includes(normalizedQuery);
+      const matchedTasks = section.tasks.filter((task) =>
+        task.title.toLowerCase().includes(normalizedQuery),
       );
+
+      if (sectionMatch || matchedTasks.length > 0) {
+        acc.push({ section, sectionMatch, tasks: matchedTasks });
+      }
+
+      return acc;
+    }, []);
   }, [normalizedQuery, sections]);
 
   const handleTaskLaunch = (
@@ -368,36 +357,18 @@ export default function HomeScreen() {
               <p className="text-xs text-(--vv-muted)">場所を選んで始める</p>
             </div>
           </div>
-          <div className="relative" ref={profileRef}>
+          <div className="relative">
             <button
               type="button"
-              onClick={() => setIsProfileOpen((prev) => !prev)}
-              aria-expanded={isProfileOpen}
+              onClick={() => router.push("/profile")}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-(--vv-accent) text-sm font-semibold text-white shadow-sm ring-1 ring-(--vv-ring)"
             >
               TH
             </button>
-            {isProfileOpen ? (
-              <div className="absolute right-0 z-30 mt-2 w-40 rounded-2xl bg-white p-2 shadow-[0_14px_30px_rgba(0,0,0,0.12)] ring-1 ring-(--vv-ring)">
-                <button
-                  type="button"
-                  className="w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-(--vv-muted) transition hover:bg-(--vv-border)"
-                >
-                  プロフィール
-                </button>
-                <button
-                  type="button"
-                  onClick={() => router.push("/login")}
-                  className="mt-1 w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-red-600 transition hover:bg-red-50"
-                >
-                  ログアウト
-                </button>
-              </div>
-            ) : null}
           </div>
         </header>
 
-        <div className="relative vv-rise-in vv-delay-1">
+        <div className="relative z-30 vv-rise-in vv-delay-1">
           <SearchIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-(--vv-muted)" />
           <input
             value={query}
@@ -405,9 +376,88 @@ export default function HomeScreen() {
             placeholder="場所や状況を検索..."
             className="h-12 w-full rounded-2xl border border-transparent bg-white/90 pl-12 pr-4 text-sm text-foreground shadow-sm ring-1 ring-(--vv-ring) transition focus:border-(--vv-accent) focus:outline-none"
           />
+          {normalizedQuery ? (
+            <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-2xl bg-white p-2 shadow-[0_18px_28px_rgba(0,0,0,0.12)] ring-1 ring-(--vv-ring)">
+              {searchGroups.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-(--vv-border) px-3 py-4 text-center text-xs text-(--vv-muted)">
+                  該当する結果が見つかりません。
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {searchGroups.map((group) => (
+                    <div
+                      key={group.section.id}
+                      className="rounded-xl border border-(--vv-border) bg-white/80"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenIds((prev) =>
+                            prev.includes(group.section.id)
+                              ? prev
+                              : [...prev, group.section.id],
+                          );
+                          setQuery("");
+                        }}
+                        className="flex w-full items-center justify-between gap-3 px-3 py-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-8 w-8 items-center justify-center text-(--vv-accent-strong)">
+                            <Icon
+                              name={group.section.icon}
+                              className="h-4 w-4"
+                            />
+                          </span>
+                          <div className="text-left">
+                            <p className="text-sm font-semibold">
+                              {highlightText(group.section.label)}
+                            </p>
+                            <p className="text-[11px] text-(--vv-muted)">
+                              {group.section.tasks.length > 0
+                                ? `${group.section.tasks.length} レッスン`
+                                : "準備中"}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronIcon className="h-4 w-4 text-(--vv-muted)" />
+                      </button>
+                      {group.tasks.length > 0 ? (
+                        <div className="border-t border-(--vv-border) px-3 py-2">
+                          <div className="flex flex-col gap-2">
+                            {group.tasks.map((task) => (
+                              <button
+                                key={task.id}
+                                type="button"
+                                onClick={() => {
+                                  setOpenIds((prev) =>
+                                    prev.includes(group.section.id)
+                                      ? prev
+                                      : [...prev, group.section.id],
+                                  );
+                                  setQuery("");
+                                }}
+                                className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1 text-left text-sm text-foreground transition hover:bg-(--vv-border)"
+                              >
+                                <span className="font-medium">
+                                  {highlightText(task.title)}
+                                </span>
+                                <span className="text-[11px] text-(--vv-muted)">
+                                  {group.section.label}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
 
-        <section className="rounded-3xl bg-white/90 p-4 shadow-[0_18px_32px_rgba(31,43,39,0.08)] ring-1 ring-(--vv-ring) vv-rise-in vv-delay-2">
+        <section className="relative z-10 rounded-3xl bg-white/90 p-4 shadow-[0_18px_32px_rgba(31,43,39,0.08)] ring-1 ring-(--vv-ring) vv-rise-in vv-delay-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-(--vv-muted)">
               全体の進捗
@@ -423,104 +473,94 @@ export default function HomeScreen() {
             />
           </div>
           <div className="mt-2 flex flex-col gap-3">
-            {filteredSections.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-(--vv-border) p-4 text-center text-xs text-(--vv-muted)">
-                該当するシーンが見つかりません。
-              </div>
-            ) : (
-              filteredSections.map((section) => {
-                const isOpen =
-                  openIds.includes(section.id) ||
-                  (query.trim().length > 0 && section.tasks.length > 0);
+            {sections.map((section) => {
+              const isOpen = openIds.includes(section.id);
 
-                return (
-                  <div
-                    key={section.id}
-                    className="rounded-2xl border border-(--vv-border) bg-white/80"
+              return (
+                <div
+                  key={section.id}
+                  className="rounded-2xl border border-(--vv-border) bg-white/80"
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenIds((prev) =>
+                        prev.includes(section.id)
+                          ? prev.filter((id) => id !== section.id)
+                          : [...prev, section.id],
+                      )
+                    }
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3"
                   >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpenIds((prev) =>
-                          prev.includes(section.id)
-                            ? prev.filter((id) => id !== section.id)
-                            : [...prev, section.id],
-                        )
-                      }
-                      className="flex w-full items-center justify-between gap-3 px-4 py-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center text-(--vv-accent-strong)">
-                          <Icon name={section.icon} className="h-5 w-5" />
-                        </span>
-                        <div className="text-left">
-                          <p className="text-sm font-semibold">
-                            {highlightText(section.label)}
-                          </p>
-                          <p className="text-xs text-(--vv-muted)">
-                            {section.tasks.length > 0
-                              ? `${section.tasks.length} レッスン`
-                              : "準備中"}
-                          </p>
-                        </div>
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 items-center justify-center text-(--vv-accent-strong)">
+                        <Icon name={section.icon} className="h-5 w-5" />
+                      </span>
+                      <div className="text-left">
+                        <p className="text-sm font-semibold">{section.label}</p>
+                        <p className="text-xs text-(--vv-muted)">
+                          {section.tasks.length > 0
+                            ? `${section.tasks.length} レッスン`
+                            : "準備中"}
+                        </p>
                       </div>
-                      <ChevronIcon
-                        className={`h-4 w-4 text-(--vv-muted) transition-transform ${
-                          isOpen ? "rotate-180" : "rotate-0"
-                        }`}
-                      />
-                    </button>
+                    </div>
+                    <ChevronIcon
+                      className={`h-4 w-4 text-(--vv-muted) transition-transform ${
+                        isOpen ? "rotate-180" : "rotate-0"
+                      }`}
+                    />
+                  </button>
 
-                    {isOpen ? (
-                      <div className="border-t border-(--vv-border) px-4 py-3">
-                        {section.tasks.length === 0 ? (
-                          <p className="text-xs text-(--vv-muted)">
-                            まもなく追加されます。
-                          </p>
-                        ) : (
-                          <div className="flex flex-col gap-3">
-                            {section.tasks.map((task) => (
-                              <div
-                                key={task.id}
-                                className="flex items-center justify-between gap-3"
-                              >
-                                <p className="text-sm font-medium text-foreground">
-                                  {highlightText(task.title)}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                  <ToggleButton
-                                    label="語彙"
-                                    active={task.vocab}
-                                    onClick={() =>
-                                      handleTaskLaunch(
-                                        section.id,
-                                        task.id,
-                                        "vocab",
-                                      )
-                                    }
-                                  />
-                                  <ToggleButton
-                                    label="聞く"
-                                    active={task.listen}
-                                    onClick={() =>
-                                      handleTaskLaunch(
-                                        section.id,
-                                        task.id,
-                                        "listen",
-                                      )
-                                    }
-                                  />
-                                </div>
+                  {isOpen ? (
+                    <div className="border-t border-(--vv-border) px-4 py-3">
+                      {section.tasks.length === 0 ? (
+                        <p className="text-xs text-(--vv-muted)">
+                          まもなく追加されます。
+                        </p>
+                      ) : (
+                        <div className="flex flex-col gap-3">
+                          {section.tasks.map((task) => (
+                            <div
+                              key={task.id}
+                              className="flex items-center justify-between gap-3"
+                            >
+                              <p className="text-sm font-medium text-foreground">
+                                {task.title}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <ToggleButton
+                                  label="語彙"
+                                  active={task.vocab}
+                                  onClick={() =>
+                                    handleTaskLaunch(
+                                      section.id,
+                                      task.id,
+                                      "vocab",
+                                    )
+                                  }
+                                />
+                                <ToggleButton
+                                  label="聞く"
+                                  active={task.listen}
+                                  onClick={() =>
+                                    handleTaskLaunch(
+                                      section.id,
+                                      task.id,
+                                      "listen",
+                                    )
+                                  }
+                                />
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })
-            )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </section>
       </div>

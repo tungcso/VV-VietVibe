@@ -1,13 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import AdminSidebar from "./admin-sidebar";
 
-type ModalType =
-  | "activities"
-  | "vocab"
-  | "listening"
-  | "users"
-  | null;
+type ModalType = "activities" | "vocab" | "listening" | "users" | null;
 
 const activities = [
   {
@@ -104,79 +100,7 @@ export default function DashboardScreen() {
   return (
     <div className="min-h-screen w-full text-[#1f2b27]">
       <div className="relative min-h-screen w-full">
-        <aside className="fixed left-0 top-0 flex h-screen w-64 flex-col bg-white/95 p-5 ring-1 ring-[rgba(47,93,80,0.12)]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#2f5d50] text-sm font-semibold text-white">
-              VV
-            </div>
-            <div>
-              <p className="text-sm font-semibold">VietVibe</p>
-              <p className="text-[11px] text-[#7b8b83]">Bảng quản trị</p>
-            </div>
-          </div>
-
-          <div className="mt-8">
-            <p className="text-[11px] font-semibold uppercase text-[#9aa8a2]">
-              Danh mục
-            </p>
-            <div className="mt-3 flex flex-col gap-2">
-              <button
-                type="button"
-                className="flex items-center gap-3 rounded-2xl bg-[#d8eee2] px-3 py-2 text-sm font-semibold text-[#1f2b27]"
-              >
-                <SquareIcon className="h-4 w-4" />
-                Dashboard
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-3 rounded-2xl px-3 py-2 text-sm text-[#7b8b83]"
-              >
-                <FolderIcon className="h-4 w-4" />
-                Quản lý nội dung
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-3 rounded-2xl px-3 py-2 text-sm text-[#7b8b83]"
-              >
-                <MicIcon className="h-4 w-4" />
-                Kho tệp âm
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-8">
-            <p className="text-[11px] font-semibold uppercase text-[#9aa8a2]">
-              Người dùng
-            </p>
-            <div className="mt-3 flex flex-col gap-2">
-              <button
-                type="button"
-                className="flex items-center gap-3 rounded-2xl px-3 py-2 text-sm text-[#7b8b83]"
-              >
-                <UsersIcon className="h-4 w-4" />
-                Quản lý người dùng
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-auto rounded-2xl bg-[#f5f7f3] p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#2f5d50] text-xs font-semibold text-white">
-                AD
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold">Admin</p>
-                <p className="text-[11px] text-[#9aa8a2]">Quản trị viên</p>
-              </div>
-              <button
-                type="button"
-                className="text-xs font-semibold text-red-500"
-              >
-                Đăng xuất
-              </button>
-            </div>
-          </div>
-        </aside>
+        <AdminSidebar active="dashboard" />
 
         <main className="ml-56 min-h-screen w-[calc(100%-14rem)] bg-[#f4f6f2]">
           <div className="min-h-[140vh] bg-white/90 pl-8 pb-16">
@@ -338,7 +262,9 @@ export default function DashboardScreen() {
                 >
                   <div>
                     <p className="font-semibold">{item.title}</p>
-                    <p className="text-[11px] text-[#9aa8a2]">{item.subtitle}</p>
+                    <p className="text-[11px] text-[#9aa8a2]">
+                      {item.subtitle}
+                    </p>
                   </div>
                   <div className="text-right text-[11px] text-[#9aa8a2]">
                     <p>{item.time}</p>
@@ -520,7 +446,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-6">
-      <div className="w-full max-w-[720px] rounded-2xl bg-white p-6 shadow-[0_20px_40px_rgba(0,0,0,0.18)]">
+      <div className="w-full max-w-180 rounded-2xl bg-white p-6 shadow-[0_20px_40px_rgba(0,0,0,0.18)]">
         <div className="flex justify-end">
           <button
             type="button"
@@ -640,62 +566,6 @@ function Avatar({ name, large }: { name: string; large?: boolean }) {
     >
       {initials}
     </div>
-  );
-}
-
-function SquareIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="4" y="4" width="7" height="7" />
-      <rect x="13" y="4" width="7" height="7" />
-      <rect x="4" y="13" width="7" height="7" />
-      <rect x="13" y="13" width="7" height="7" />
-    </svg>
-  );
-}
-
-function FolderIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M3 7h6l2 2h10v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-    </svg>
-  );
-}
-
-function MicIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="9" y="2" width="6" height="11" rx="3" />
-      <path d="M5 11a7 7 0 0 0 14 0" />
-      <path d="M12 18v4" />
-    </svg>
   );
 }
 
