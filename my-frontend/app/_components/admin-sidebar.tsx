@@ -87,7 +87,16 @@ export default function AdminSidebar({ active }: AdminSidebarProps) {
             <p className="text-sm font-semibold">Admin</p>
             <p className="text-[11px] text-[#9aa8a2]">Quản trị viên</p>
           </div>
-          <button type="button" className="text-xs font-semibold text-red-500">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("vietvibe_auth");
+              }
+              router.push("/login");
+            }}
+            className="text-xs font-semibold text-red-500"
+          >
             Đăng xuất
           </button>
         </div>
