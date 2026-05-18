@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 type PlayMode = "study" | "continuous";
 type AmbientSound = "cafe" | "road" | "market" | "office" | "off";
@@ -37,6 +37,8 @@ const ambientOptions: Array<{ id: AmbientSound; label: string }> = [
 ];
 
 const SETTINGS_STORAGE_KEY = "vv-listening-settings";
+const PROGRESS_STORAGE_KEY = "vv-task-progress";
+const LAST_SELECTION_STORAGE_KEY = "vv-last-selection";
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
@@ -48,6 +50,7 @@ interface StoredSettings {
 }
 
 export default function ListeningScreen() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const learningUnitId = searchParams.get("learningUnitId");
   // Persisted settings (applied immediately)
@@ -259,10 +262,55 @@ export default function ListeningScreen() {
 
   const currentLine = lines[currentIndex];
   const lessonDuration = lesson?.durationSeconds ?? 0;
+  const isLastLine = lines.length > 0 && currentIndex >= lines.length - 1;
+
+  const markListeningCompletionAndExit = () => {
+    if (typeof window !== "undefined") {
+      try {
+        const lastSelectionRaw = localStorage.getItem(
+          LAST_SELECTION_STORAGE_KEY,
+        );
+        if (lastSelectionRaw) {
+          const lastSelection = JSON.parse(lastSelectionRaw) as {
+            sectionId: string;
+            taskId: string;
+            mode: "vocab" | "listen";
+          };
+
+          if (lastSelection.mode === "listen") {
+            const stored = localStorage.getItem(PROGRESS_STORAGE_KEY);
+            const progress = stored ? JSON.parse(stored) : {};
+            if (!progress[lastSelection.sectionId]) {
+              progress[lastSelection.sectionId] = {};
+            }
+            if (!progress[lastSelection.sectionId][lastSelection.taskId]) {
+              progress[lastSelection.sectionId][lastSelection.taskId] = {};
+            }
+            progress[lastSelection.sectionId][lastSelection.taskId].listen =
+              true;
+            localStorage.setItem(
+              PROGRESS_STORAGE_KEY,
+              JSON.stringify(progress),
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Failed to store listening completion", error);
+      }
+    }
+
+    router.push("/");
+  };
 
   const goPrev = () => setCurrentIndex((prev) => Math.max(prev - 1, 0));
-  const goNext = () =>
+  const goNext = () => {
+    if (lines.length === 0) return;
+    if (isLastLine) {
+      markListeningCompletionAndExit();
+      return;
+    }
     setCurrentIndex((prev) => Math.min(prev + 1, lines.length - 1));
+  };
 
   const formatSeconds = (totalSeconds: number) => {
     const minutes = Math.floor(totalSeconds / 60);
@@ -549,10 +597,10 @@ export default function ListeningScreen() {
           <button
             type="button"
             onClick={goNext}
-            disabled={currentIndex === lines.length - 1 || lines.length === 0}
+            disabled={lines.length === 0}
             className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-(--vv-muted) ring-1 ring-(--vv-border) disabled:opacity-50"
           >
-            次の文
+            {isLastLine ? "完了" : "次の文"}
             <ChevronRightIcon className="h-4 w-4" />
           </button>
         </div>

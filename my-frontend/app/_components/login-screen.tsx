@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 type AuthMode = "login" | "register";
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -18,7 +19,10 @@ export default function LoginScreen() {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
-  const saveAuthData = (token: string, user: { id: string; email: string; user_name: string; role: string }) => {
+  const saveAuthData = (
+    token: string,
+    user: { id: string; email: string; user_name: string; role: string },
+  ) => {
     if (typeof window === "undefined") return;
 
     const authData = {
@@ -48,7 +52,8 @@ export default function LoginScreen() {
     }
 
     const endpoint = `${API_BASE_URL}/auth/${mode}`;
-    const body = mode === "login" ? { email, password } : { name, email, password };
+    const body =
+      mode === "login" ? { email, password } : { name, email, password };
 
     try {
       const response = await fetch(endpoint, {
@@ -72,7 +77,9 @@ export default function LoginScreen() {
     } catch (error) {
       console.error(error);
       setIsError(true);
-      setMessage("サーバーに接続できません。バックエンドサービスが起動しているか、http://localhost:3001 にアクセスできるか確認してください。");
+      setMessage(
+        "サーバーに接続できません。バックエンドサービスが起動しているか、http://localhost:3001 にアクセスできるか確認してください。",
+      );
     }
   };
 
@@ -80,7 +87,7 @@ export default function LoginScreen() {
     <div className="min-h-screen w-full bg-linear-to-b from-[#f8f6f2] via-[#f3f7f3] to-[#ecf2ee]">
       <div className="mx-auto flex w-full max-w-105 flex-col items-center gap-6 px-4 pb-10 pt-10">
         <div className="flex flex-col items-center gap-3 vv-rise-in">
-          <div className="vv-display flex h-16 w-16 items-center justify-center rounded-3xl bg-(--vv-accent) text-xl text-white shadow-[0_18px_28px_rgba(35,70,60,0.28)]">
+          <div className="vv-logo flex h-16 w-16 items-center justify-center rounded-3xl bg-(--vv-accent) text-xl text-white shadow-[0_18px_28px_rgba(35,70,60,0.28)]">
             VV
           </div>
           <h1 className="text-xl font-semibold tracking-tight">VietVibe</h1>
@@ -172,7 +179,10 @@ export default function LoginScreen() {
             ) : null}
 
             <div className="flex items-center justify-between text-xs">
-              <button type="button" className="font-semibold text-(--vv-accent-strong)">
+              <button
+                type="button"
+                className="font-semibold text-(--vv-accent-strong)"
+              >
                 パスワードをお忘れですか？
               </button>
               <Link href="/" className="text-(--vv-muted)">
@@ -188,7 +198,9 @@ export default function LoginScreen() {
             </button>
 
             {message ? (
-              <div className={`mt-3 rounded-2xl border px-4 py-3 text-xs ${isError ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+              <div
+                className={`mt-3 rounded-2xl border px-4 py-3 text-xs ${isError ? "border-red-200 bg-red-50 text-red-700" : "border-green-200 bg-green-50 text-green-700"}`}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <p className="flex-1">{message}</p>
                   <button
@@ -208,7 +220,9 @@ export default function LoginScreen() {
                 : "すでにアカウントをお持ちですか？"}
               <button
                 type="button"
-                onClick={() => setMode((prev) => (prev === "login" ? "register" : "login"))}
+                onClick={() =>
+                  setMode((prev) => (prev === "login" ? "register" : "login"))
+                }
                 className="ml-2 font-semibold text-(--vv-accent-strong)"
               >
                 {mode === "login" ? "新規登録" : "ログイン"}

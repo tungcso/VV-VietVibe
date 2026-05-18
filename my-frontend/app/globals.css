@@ -5,9 +5,9 @@
   --vv-ink: #1f2b27;
   --vv-muted: #6a7b73;
   --vv-card: #ffffff;
-  --vv-accent: #2f5d50;
+  --vv-accent: #defff2;
   --vv-accent-strong: #23463c;
-  --vv-accent-soft: #d5e7de;
+  --vv-accent-soft: #c7eadc;
   --vv-ring: rgba(47, 93, 80, 0.2);
   --vv-border: #e2e8e3;
 }
@@ -72,6 +72,19 @@ body {
 
 .vv-display {
   font-family: var(--font-vv-display);
+}
+
+.vv-logo {
+  font-family: var(--font-vv-display);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.vv-highlight {
+  border-radius: 4px;
+  background: rgba(47, 93, 80, 0.18);
+  color: var(--vv-accent-strong);
+  padding: 0 2px;
 }
 
 .vv-range {
