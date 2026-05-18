@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 type VocabCard = {
   id: string;
@@ -21,16 +22,51 @@ const DEFAULT_BACKEND =
 const PROGRESS_STORAGE_KEY = "vv-task-progress";
 const LAST_SELECTION_STORAGE_KEY = "vv-last-selection";
 
-async function fetchVocabCards(): Promise<VocabCard[]> {
+async function fetchVocabCards(learningUnitId?: string): Promise<VocabCard[]> {
   try {
-    const res = await fetch(`${DEFAULT_BACKEND}/vocabulary?limit=100`);
-    const json = await res.json();
-    if (!res.ok) {
-      const msg = json?.message || json?.error || `Fetch failed: ${res.status}`;
-      throw new Error(msg);
+    let url = `${DEFAULT_BACKEND}/vocabulary`;
+
+    // If learningUnitId is provided, fetch vocabulary for that specific unit
+    if (learningUnitId) {
+      url = `${DEFAULT_BACKEND}/vocabulary/learning-unit/${learningUnitId}`;
+    } else {
+      url = `${DEFAULT_BACKEND}/vocabulary?limit=100`;
     }
-    // backend returns { data: [cards], meta: {...} }
-    const data = Array.isArray(json.data) ? json.data : [];
+
+    console.log(`Fetching vocab from: ${url}`);
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      const contentType = res.headers.get("content-type");
+      let errorMsg = `HTTP ${res.status}`;
+
+      if (contentType?.includes("application/json")) {
+        try {
+          const json = await res.json();
+          errorMsg = json?.message || json?.error || errorMsg;
+        } catch (e) {
+          // response.json() failed, use status text
+          errorMsg = res.statusText || errorMsg;
+        }
+      }
+
+      throw new Error(`${errorMsg}`);
+    }
+
+    const json = await res.json();
+
+    // Handle both array response and { data: [...] } response
+    const data = Array.isArray(json)
+      ? json
+      : Array.isArray(json.data)
+        ? json.data
+        : [];
     return data.map((c: any) => ({
       id: c.id ?? String(c._id ?? ""),
       term: c.wordVi ?? c.word_vi ?? c.term ?? "",
@@ -41,13 +77,16 @@ async function fetchVocabCards(): Promise<VocabCard[]> {
       note: c.note ?? undefined,
     }));
   } catch (error) {
-    console.error("Failed to load vocab cards", error);
-    return [];
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error("Failed to load vocab cards:", errorMsg);
+    throw error;
   }
 }
 
 export default function VocabScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const learningUnitId = searchParams.get("learningUnitId");
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
 
@@ -116,7 +155,9 @@ export default function VocabScreen() {
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    fetchVocabCards()
+    setError(null);
+
+    fetchVocabCards(learningUnitId ?? undefined)
       .then((result) => {
         if (!mounted) return;
         setCards(result);
@@ -124,15 +165,18 @@ export default function VocabScreen() {
         setLoading(false);
       })
       .catch((err: any) => {
-        console.error(err);
         if (!mounted) return;
-        setError(err?.message || "Failed to load vocabulary");
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        console.error("useEffect - Vocab fetch error:", errorMsg);
+        setError(errorMsg || "Failed to load vocabulary cards");
+        setCards([]);
         setLoading(false);
       });
+
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [learningUnitId]);
 
   return (
     <div className="min-h-screen w-full bg-[#f6f7f3]">
@@ -183,7 +227,42 @@ export default function VocabScreen() {
               読み込み中...
             </div>
           ) : error ? (
-            <div className="mt-6 text-center text-sm text-red-600">{error}</div>
+            <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm">
+              <div className="mb-2 font-semibold text-red-700">エラー</div>
+              <div className="mb-3 text-red-600">{error}</div>
+              <div className="border-t border-red-200 pt-3 text-xs text-red-600">
+                <p className="mb-2 font-semibold">デバッグ情報:</p>
+                <p>
+                  Backend URL:{" "}
+                  <code className="font-mono">{DEFAULT_BACKEND}</code>
+                </p>
+                {learningUnitId && (
+                  <p>
+                    Learning Unit ID:{" "}
+                    <code className="font-mono">{learningUnitId}</code>
+                  </p>
+                )}
+                <p className="mt-2 font-semibold">トラブルシューティング:</p>
+                <ul className="list-inside list-disc space-y-1 text-xs">
+                  <li>
+                    バックエンドが起動しているか確認:{" "}
+                    <code className="font-mono">npm run start:dev</code>
+                  </li>
+                  <li>バックエンドがポート3001で起動していることを確認</li>
+                  <li>
+                    Swagger ドキュメント:{" "}
+                    <a
+                      href="http://localhost:3001/api/docs"
+                      target="_blank"
+                      className="underline"
+                    >
+                      http://localhost:3001/api/docs
+                    </a>
+                  </li>
+                  <li>ブラウザの開発ツールのコンソールでエラーを確認</li>
+                </ul>
+              </div>
+            </div>
           ) : cards.length === 0 ? (
             <div className="mt-6 text-center text-sm text-(--vv-muted)">
               単語が見つかりません。

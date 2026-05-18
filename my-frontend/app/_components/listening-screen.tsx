@@ -103,9 +103,9 @@ export default function ListeningScreen() {
         let selectedLesson: ListeningLesson | null = null;
 
         if (learningUnitId) {
-          const detailRes = await fetch(
-            `${BACKEND_URL}/listening/learning-unit/${learningUnitId}`,
-          );
+          const url = `${BACKEND_URL}/listening/learning-unit/${learningUnitId}`;
+          console.log(`Fetching listening lesson from: ${url}`);
+          const detailRes = await fetch(url);
           const detailJson = await detailRes.json();
 
           if (!detailRes.ok) {
@@ -138,7 +138,9 @@ export default function ListeningScreen() {
               : [],
           };
         } else {
-          const listRes = await fetch(`${BACKEND_URL}/listening`);
+          const listUrl = `${BACKEND_URL}/listening`;
+          console.log(`Fetching listening list from: ${listUrl}`);
+          const listRes = await fetch(listUrl);
           const listJson = await listRes.json();
 
           if (!listRes.ok) {
@@ -156,7 +158,9 @@ export default function ListeningScreen() {
           }
 
           const id = String(chosen._id ?? chosen.id);
-          const detailRes = await fetch(`${BACKEND_URL}/listening/${id}`);
+          const detailUrl = `${BACKEND_URL}/listening/${id}`;
+          console.log(`Fetching listening detail from: ${detailUrl}`);
+          const detailRes = await fetch(detailUrl);
           const detailJson = await detailRes.json();
 
           if (!detailRes.ok) {
@@ -524,8 +528,40 @@ export default function ListeningScreen() {
             読み込み中...
           </div>
         ) : loadError ? (
-          <div className="rounded-3xl bg-white/90 p-4 text-center text-sm text-red-600 ring-1 ring-(--vv-ring)">
-            {loadError}
+          <div className="rounded-3xl bg-red-50 p-4 text-sm ring-1 ring-red-200">
+            <div className="mb-2 font-semibold text-red-700">エラー</div>
+            <div className="mb-3 text-red-600">{loadError}</div>
+            <div className="border-t border-red-200 pt-3 text-xs text-red-600">
+              <p className="mb-2 font-semibold">デバッグ情報:</p>
+              <p>
+                Backend URL: <code className="font-mono">{BACKEND_URL}</code>
+              </p>
+              {learningUnitId && (
+                <p>
+                  Learning Unit ID:{" "}
+                  <code className="font-mono">{learningUnitId}</code>
+                </p>
+              )}
+              <p className="mt-2 font-semibold">トラブルシューティング:</p>
+              <ul className="list-inside list-disc space-y-1">
+                <li>
+                  バックエンドが起動しているか確認:{" "}
+                  <code className="font-mono">npm run start:dev</code>
+                </li>
+                <li>バックエンドがポート3001で起動していることを確認</li>
+                <li>
+                  Swagger ドキュメント:{" "}
+                  <a
+                    href="http://localhost:3001/api/docs"
+                    target="_blank"
+                    className="underline"
+                  >
+                    http://localhost:3001/api/docs
+                  </a>
+                </li>
+                <li>ブラウザのコンソールでエラーを確認</li>
+              </ul>
+            </div>
           </div>
         ) : null}
 

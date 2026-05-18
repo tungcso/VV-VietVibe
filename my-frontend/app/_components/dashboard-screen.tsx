@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AdminSidebar from "./admin-sidebar";
+import { useRouter } from "next/navigation";
 
 type ModalType = "activities" | "vocab" | "listening" | "users" | null;
 
@@ -95,6 +96,7 @@ const users = [
 ];
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
   return (

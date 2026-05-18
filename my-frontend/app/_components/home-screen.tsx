@@ -1,17 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
-
-type ToggleField = "vocab" | "listen";
 
 type Task = {
   id: string;
   title: string;
   vocab: boolean;
   listen: boolean;
+  learningUnitId?: string;
 };
+
+type ToggleField = "vocab" | "listen";
 
 type IconName =
   | "cart"
@@ -29,6 +30,30 @@ type Section = {
   tasks: Task[];
 };
 
+type Place = {
+  id: string;
+  nameVi: string;
+  nameJa: string;
+  description?: string | null;
+};
+
+type Situation = {
+  id: string;
+  placeId: string;
+  titleVi: string;
+  titleJa: string;
+  description?: string | null;
+};
+
+type LearningUnit = {
+  id: string;
+  situationId: string;
+  levelId: string;
+  titleVi: string;
+  titleJa: string;
+  description?: string | null;
+};
+
 type TaskProgress = Record<
   string,
   Record<string, { vocab?: boolean; listen?: boolean }>
@@ -42,6 +67,18 @@ type SearchGroup = {
 
 const PROGRESS_STORAGE_KEY = "vv-task-progress";
 const LAST_SELECTION_STORAGE_KEY = "vv-last-selection";
+
+// Map places to icon names
+const placeIconMap: Record<string, IconName> = {
+  super: "cart",
+  supermarket: "cart",
+  restaurant: "restaurant",
+  hospital: "hospital",
+  bus: "bus",
+  salon: "salon",
+  bank: "bank",
+  taxi: "taxi",
+};
 
 const initialSections: Section[] = [
   {
@@ -165,7 +202,111 @@ export default function HomeScreen() {
   const [notificationMode, setNotificationMode] = useState<
     "login" | "register"
   >("login");
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const profileRef = useRef<HTMLDivElement | null>(null);
 
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+
+  // Check user role and redirect admin to dashboard
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const authData = localStorage.getItem("vietvibe_auth");
+    if (!authData) return;
+
+    try {
+      const { user } = JSON.parse(authData);
+      if (user?.role === "admin") {
+        router.push("/dashboard");
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+  }, [router]);
+
+  // Load data from API
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoadingData(true);
+
+        // Fetch places
+        const placesRes = await fetch(`${API_BASE_URL}/listening/places`);
+        if (!placesRes.ok) throw new Error("Failed to fetch places");
+        const places: Place[] = await placesRes.json();
+
+        const sectionsData = await Promise.all(
+          places.map(async (place) => {
+            const situationsRes = await fetch(
+              `${API_BASE_URL}/listening/places/${place.id}/situations`,
+            );
+            if (!situationsRes.ok) return null;
+            const situations: Situation[] = await situationsRes.json();
+
+            const tasksBySituation = await Promise.all(
+              situations.map(async (situation) => {
+                const learningUnitsRes = await fetch(
+                  `${API_BASE_URL}/listening/situations/${situation.id}/learning-units`,
+                );
+                if (!learningUnitsRes.ok) return [] as Task[];
+
+                const learningUnits: LearningUnit[] =
+                  await learningUnitsRes.json();
+
+                return learningUnits.map((unit) => ({
+                  id: unit.id,
+                  title: unit.titleJa,
+                  vocab: true,
+                  listen: true,
+                  learningUnitId: unit.id,
+                }));
+              }),
+            );
+
+            const tasks = tasksBySituation.flat();
+
+            const placeKey = place.nameVi.toLowerCase().replace(/\s+/g, "-");
+            const icon: IconName = Object.keys(placeIconMap).some((key) =>
+              placeKey.includes(key),
+            )
+              ? placeIconMap[
+                  Object.keys(placeIconMap).find((key) =>
+                    placeKey.includes(key),
+                  ) as string
+                ]
+              : "cart";
+
+            return {
+              id: place.id,
+              label: place.nameJa,
+              icon,
+              tasks,
+            };
+          }),
+        );
+
+        const nextSections = sectionsData.filter(
+          (section): section is Section => section !== null,
+        );
+
+        if (nextSections.length > 0) {
+          setSections(nextSections);
+          setOpenIds([nextSections[0]?.id ?? ""]);
+        }
+      } catch (error) {
+        console.error("Failed to load data from API:", error);
+        // Use fallback data
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    loadData();
+  }, [API_BASE_URL]);
+
+  // Handle login/register notification
   useEffect(() => {
     if (typeof window === "undefined") return;
 
