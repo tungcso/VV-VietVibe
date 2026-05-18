@@ -36,14 +36,6 @@ import { Roles } from '../login/decorators/roles.decorator.js';
 export class ListeningController {
   constructor(private readonly listeningService: ListeningService) {}
 
-  @Get()
-  @ApiOperation({ summary: 'Get all listening lessons' })
-  @ApiOkResponse({ description: 'List of listening lessons' })
-  getAllListeningLessons() {
-    return this.listeningService.getAllListeningLessons();
-  }
-
-<<<<<<< HEAD
   @Get('places')
   @ApiOperation({ summary: 'Get all places' })
   @ApiOkResponse({ description: 'List of places' })
@@ -69,8 +61,13 @@ export class ListeningController {
     return this.listeningService.getLearningUnitsBySituationId(situationId);
   }
 
-=======
->>>>>>> main
+  @Get()
+  @ApiOperation({ summary: 'Get all listening lessons' })
+  @ApiOkResponse({ description: 'List of listening lessons' })
+  getAllListeningLessons() {
+    return this.listeningService.getAllListeningLessons();
+  }
+
   @Get('learning-unit/:learningUnitId')
   @ApiOperation({ summary: 'Get listening lesson by learning unit id' })
   @ApiParam({ name: 'learningUnitId', description: 'Learning unit id' })

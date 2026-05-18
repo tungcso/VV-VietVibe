@@ -31,6 +31,9 @@ const mongoose = require('mongoose');
 const { Types } = mongoose;
 
 const {
+  Place,
+  Situation,
+  Level,
   LearningUnit,
   ListeningLesson,
   ListeningSession,
