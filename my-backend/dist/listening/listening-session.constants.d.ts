@@ -1,0 +1,14 @@
+export declare const PLAYBACK_SPEEDS: readonly [0.75, 1];
+export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];
+export declare const PLAYBACK_MODES: readonly ["study", "continuous"];
+export type PlaybackMode = (typeof PLAYBACK_MODES)[number];
+export declare const AMBIENT_SOUNDS: readonly ["cafe", "road", "market", "office"];
+export type AmbientSound = (typeof AMBIENT_SOUNDS)[number];
+export declare const DEFAULT_PLAYBACK_SPEED: PlaybackSpeed;
+export declare const DEFAULT_PLAYBACK_MODE: PlaybackMode;
+export declare const DEFAULT_AMBIENT_SOUND: AmbientSound | null;
+export declare const DEFAULT_AMBIENT_VOLUME = 40;
+export declare function normalizePlaybackSpeed(value: unknown): PlaybackSpeed | undefined;
+export declare function normalizePlaybackMode(value: unknown): PlaybackMode | undefined;
+export declare function normalizeAmbientSound(value: unknown): AmbientSound | null | undefined;
+export declare function normalizeAmbientVolume(value: unknown): number | undefined;
